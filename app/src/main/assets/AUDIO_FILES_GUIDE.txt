@@ -1,0 +1,9 @@
+ضع الملفات الصوتية في: app/src/main/res/raw/
+
+الأذان (5):        adhan_fajr.ogg  adhan_dhuhr.ogg  adhan_asr.ogg  adhan_maghrib.ogg  adhan_isha.ogg
+تنبيه قبل الصلاة (5): alert_fajr.ogg (قبل 5 دقائق)  alert_dhuhr.ogg  alert_asr.ogg  alert_maghrib.ogg  alert_isha.ogg (قبل 10 دقائق)
+المنبه:           alarm_01.ogg ... alarm_10.ogg
+التسبيحات:        tasbih_01.ogg ... tasbih_10.ogg
+
+الصيغة المفضولة: OGG   |   مقبولة أيضا: MP3
+التطبيق يبني بنجاح حتى بدون الملفات - يستخدم نغمة افتراضية عند غياب أي ملف.
