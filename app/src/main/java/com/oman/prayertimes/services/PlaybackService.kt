@@ -16,7 +16,7 @@ class PlaybackService : Service() {
         }
         val sound = intent?.getStringExtra("sound") ?: "adhan_fajr"
         val title = intent?.getStringExtra("title") ?: "الأذان"
-        val repeat = intent.getIntExtra("repeat", 1)
+        val repeat = intent?.getIntExtra("repeat", 1) ?: 1
 
         startForeground(NotificationHelper.NTF_PLAYBACK,
             NotificationHelper.playbackNotification(this, title))
