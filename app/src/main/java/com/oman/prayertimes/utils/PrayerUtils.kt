@@ -31,8 +31,9 @@ object PrayerUtils {
         val h = totalSeconds / 3600
         val m = (totalSeconds % 3600) / 60
         val s = totalSeconds % 60
-        return if (h > 0) "%dس %02dد %02dث".format(h, m, s)
-        else "%dد %02dث".format(m, s)
+        val l = java.util.Locale.US
+        return if (h > 0) String.format(l, "%dس %02dد %02dث", h, m, s)
+        else String.format(l, "%dد %02dث", m, s)
     }
 
     fun calendarForToday(hhmm: String, date: LocalDate = LocalDate.now()): Long {
@@ -73,3 +74,4 @@ object PrayerUtils {
         return Triple(yh, mh, dh)
     }
 }
+

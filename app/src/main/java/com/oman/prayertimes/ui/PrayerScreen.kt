@@ -147,7 +147,7 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
                 color = MaterialTheme.colorScheme.onPrimary,
                 style = MaterialTheme.typography.titleMedium)
             Text(
-                today.format(DateTimeFormatter.ofPattern("EEEE، d MMMM yyyy", Locale("ar"))),
+                today.format(DateTimeFormatter.ofPattern("EEEE، d MMMM yyyy", Locale.forLanguageTag("ar-u-nu-latn"))),
                 color = MaterialTheme.colorScheme.onPrimary,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -231,3 +231,4 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
         }
     }
 }
+

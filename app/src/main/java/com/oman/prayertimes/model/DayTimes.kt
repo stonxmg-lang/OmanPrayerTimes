@@ -29,7 +29,7 @@ data class DayTimes(
                 val m = p[1].toInt()
                 if (key in listOf("asr", "maghrib", "isha") && h < 12) h += 12
                 else if (key == "dhuhr" && h < 6) h += 12
-                "%02d:%02d".format(h, m)
+                String.format(java.util.Locale.US, "%02d:%02d", h, m)
             } catch (e: Exception) { t }
         }
     }
