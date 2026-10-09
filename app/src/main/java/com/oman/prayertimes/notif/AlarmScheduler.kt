@@ -33,6 +33,7 @@ object AlarmScheduler {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
     private fun exactAt(context: Context, triggerAt: Long, pi: PendingIntent) {
+        if (triggerAt <= System.currentTimeMillis()) return
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         try {
             if (am.canScheduleExactAlarms()) {
@@ -200,3 +201,4 @@ object AlarmScheduler {
         cancel(context, RQ_COUNTDOWN); cancel(context, RQ_FAJR_ALARM)
     }
 }
+
