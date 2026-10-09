@@ -17,6 +17,17 @@ object PrayerUtils {
         } catch (e: Exception) { -1 }
     }
 
+    /** يحوّل "15:27" إلى "3:27 م" للعرض فقط (الحساب الداخلي يبقى 24 ساعة) */
+    fun format12(hhmm: String): String {
+        val total = toMinutes(hhmm)
+        if (total < 0) return hhmm
+        val h24 = total / 60
+        val mm = total % 60
+        val h12 = if (h24 % 12 == 0) 12 else h24 % 12
+        val suffix = if (h24 < 12) "ص" else "م"
+        return String.format(java.util.Locale.US, "%d:%02d %s", h12, mm, suffix)
+    }
+
     /** index of next prayer, or null if all passed (next = tomorrow's fajr) */
     fun nextPrayerIndex(times: DayTimes, nowMinutes: Int): Int {
         for (i in DayTimes.KEYS.indices) {

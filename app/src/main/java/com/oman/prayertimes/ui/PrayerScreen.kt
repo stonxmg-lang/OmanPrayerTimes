@@ -210,7 +210,7 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
                         fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal
                     )
                     Text(
-                        DayTimes.get(times, key),
+                        PrayerUtils.format12(DayTimes.get(times, key)),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal,
                         color = if (isNext) MaterialTheme.colorScheme.primary

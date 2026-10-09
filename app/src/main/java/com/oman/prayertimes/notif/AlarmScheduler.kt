@@ -179,7 +179,7 @@ object AlarmScheduler {
         val text = if (diff in 1..60) {
             "الصلاة القادمة: $name بعد $diff دقيقة"
         } else {
-            "الصلاة القادمة: $name - $t"
+            "الصلاة القادمة: $name - ${PrayerUtils.format12(t)}"
         }
         NotificationHelper.showPersistent(context, text)
     }
