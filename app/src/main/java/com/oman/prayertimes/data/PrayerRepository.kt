@@ -78,7 +78,7 @@ class PrayerRepository(private val context: Context) {
     // ── Network ────────────────────────────────────────────────────
     suspend fun hasInternet(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val conn = URL("https://www.mara.gov.om").openConnection() as HttpURLConnection
+            val conn = open("https://www.mara.gov.om")
             conn.connectTimeout = 5000
             conn.readTimeout = 5000
             conn.responseCode in 200..399
@@ -114,9 +114,26 @@ class PrayerRepository(private val context: Context) {
         all
     }
 
+    // يتخطى فحص الشهادة لموقع mara.gov.om فقط (نفس curl -k)
+    private fun open(url: String): HttpURLConnection {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        if (conn is javax.net.ssl.HttpsURLConnection) {
+            val trustAll = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
+                override fun checkClientTrusted(c: Array<java.security.cert.X509Certificate>?, a: String?) {}
+                override fun checkServerTrusted(c: Array<java.security.cert.X509Certificate>?, a: String?) {}
+                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+            })
+            val ctx = javax.net.ssl.SSLContext.getInstance("TLS")
+            ctx.init(null, trustAll, java.security.SecureRandom())
+            conn.sslSocketFactory = ctx.socketFactory
+            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { host, _ -> host.endsWith("mara.gov.om") }
+        }
+        return conn
+    }
+
     private fun httpPost(url: String, form: String): String? {
         return try {
-            val conn = URL(url).openConnection() as HttpURLConnection
+            val conn = open(url)
             conn.requestMethod = "POST"
             conn.connectTimeout = 12000
             conn.readTimeout = 20000
@@ -129,3 +146,4 @@ class PrayerRepository(private val context: Context) {
         } catch (e: Exception) { null }
     }
 }
+
