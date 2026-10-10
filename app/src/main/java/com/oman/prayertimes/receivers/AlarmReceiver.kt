@@ -55,7 +55,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 })
             }
             TYPE_DND_EXIT -> {
-                if (settings.dndEnabled) DndController.exit(context)
+                DndController.exit(context)
             }
             TYPE_COUNTDOWN -> {
                 AlarmScheduler.refreshCountdown(context)

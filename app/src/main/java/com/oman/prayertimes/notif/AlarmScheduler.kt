@@ -52,6 +52,9 @@ object AlarmScheduler {
         val settings = SettingsStore(context)
         val keys = DayTimes.KEYS
 
+        // تصحيح حالة الصامت (يدخل/يخرج حسب الوقت حتى لو ضاع منبه الدخول أو الخروج)
+        DndController.reconcile(context)
+
         // أوقات الأذان بالدقائق
         val adhanMin = keys.map { PrayerUtils.toMinutes(DayTimes.get(times, it)) }
 
