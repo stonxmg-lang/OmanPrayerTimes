@@ -58,7 +58,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 if (settings.dndEnabled) DndController.exit(context)
             }
             TYPE_COUNTDOWN -> {
-                updateCountdown(context)
+                AlarmScheduler.refreshCountdown(context)
             }
             TYPE_TASBIH -> {
                 val idx = intent.getIntExtra("tasbihIndex", 0)
@@ -81,42 +81,5 @@ class AlarmReceiver : BroadcastReceiver() {
             }
         }
     }
-
-    /** تحديث إشعار الستار كل دقيقة أثناء الساعة الأخيرة قبل الصلاة */
-    private fun updateCountdown(context: Context) {
-        val repo = PrayerRepository(context)
-        val today = LocalDate.now()
-        val times = repo.getDay(repo.loadCache(), today.year, today.monthValue, today.dayOfMonth)
-            ?: return
-        val now = java.util.Calendar.getInstance()
-        val nowMin = now.get(java.util.Calendar.HOUR_OF_DAY) * 60 + now.get(java.util.Calendar.MINUTE)
-        val idx = PrayerUtils.nextPrayerIndex(times, nowMin)
-        val name = DayTimes.NAMES[idx]
-        val t = DayTimes.get(times, DayTimes.KEYS[idx])
-        val mins = PrayerUtils.toMinutes(t)
-        val diff = if (mins > nowMin) mins - nowMin else (1440 - nowMin) // منتصف الليل
-
-        if (diff in 1..60) {
-            NotificationHelper.showPersistent(context,
-                "⏳ الصلاة القادمة: $name بعد $diff دقيقة")
-            // جدولة التحديث التالي بعد دقيقة
-            val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra("type", TYPE_COUNTDOWN)
-            }
-            val pi = PendingIntent.getBroadcast(context, AlarmScheduler.RQ_COUNTDOWN, intent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val next = System.currentTimeMillis() + 60_000
-            try {
-                if (am.canScheduleExactAlarms())
-                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pi)
-                else
-                    am.setWindow(AlarmManager.RTC_WAKEUP, next, 60_000, pi)
-            } catch (e: SecurityException) {
-                am.setWindow(AlarmManager.RTC_WAKEUP, next, 60_000, pi)
-            }
-        } else {
-            AlarmScheduler.updatePersistentNow(context, times)
-        }
-    }
 }
+

@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.oman.prayertimes.MainActivity
 import com.oman.prayertimes.R
@@ -49,6 +51,35 @@ object NotificationHelper {
         nm.notify(NTF_PERSIST, n)
     }
 
+    /** عدّاد تنازلي حيّ في الستار (يعدّ بالثانية بواسطة النظام نفسه) */
+    fun showCountdown(context: Context, label: String, targetMillis: Long) {
+        val remaining = targetMillis - System.currentTimeMillis()
+        if (remaining <= 0) return
+        val hours = remaining / 3_600_000L
+        val format = when {
+            hours >= 10 -> "%s"
+            hours >= 1 -> "0%s"
+            else -> "00:%s"
+        }
+        val rv = RemoteViews(context.packageName, R.layout.notif_countdown)
+        rv.setTextViewText(R.id.notif_label, label)
+        rv.setChronometer(R.id.notif_chrono, SystemClock.elapsedRealtime() + remaining, format, true)
+        rv.setChronometerCountDown(R.id.notif_chrono, true)
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val n = NotificationCompat.Builder(context, CH_PERSIST)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(label)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(rv)
+            .setShowWhen(false)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        nm.notify(NTF_PERSIST, n)
+    }
+
     fun showEvent(context: Context, channel: String, title: String, text: String, id: Int) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val n = NotificationCompat.Builder(context, channel)
@@ -69,3 +100,4 @@ object NotificationHelper {
             .setContentIntent(openAppIntent(context))
             .build()
 }
+

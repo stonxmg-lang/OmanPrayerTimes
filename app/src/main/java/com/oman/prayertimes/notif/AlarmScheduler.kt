@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import com.oman.prayertimes.data.PrayerRepository
 import com.oman.prayertimes.data.SettingsStore
 import com.oman.prayertimes.data.TasbihTexts
 import com.oman.prayertimes.model.DayTimes
@@ -128,12 +129,41 @@ object AlarmScheduler {
     }
 
     fun scheduleCountdownChain(context: Context, times: DayTimes, date: LocalDate) {
+        refreshCountdown(context)
+    }
+
+    /** يعرض في الستار عدّادًا تنازليًّا حيًّا للصلاة القادمة ويجدول التحديث التالي */
+    fun refreshCountdown(context: Context) {
+        val repo = PrayerRepository(context)
+        val cache = repo.loadCache()
+        val today = LocalDate.now()
+        val times = repo.getDay(cache, today.year, today.monthValue, today.dayOfMonth) ?: return
+        val now = System.currentTimeMillis()
+
+        var idx = -1
+        var target = 0L
+        for (i in DayTimes.KEYS.indices) {
+            val t = PrayerUtils.calendarForToday(DayTimes.get(times, DayTimes.KEYS[i]), today)
+            if (t > now + 1000) { idx = i; target = t; break }
+        }
+        if (idx < 0) { // بعد العشاء: فجر الغد
+            idx = 0
+            val tomorrow = today.plusDays(1)
+            val tTimes = repo.getDay(cache, tomorrow.year, tomorrow.monthValue, tomorrow.dayOfMonth) ?: times
+            target = PrayerUtils.calendarForToday(DayTimes.get(tTimes, "fajr"), tomorrow)
+        }
+
+        val name = DayTimes.NAMES[idx]
+        val label = if (DayTimes.KEYS[idx] == "sunrise") "باقي على $name" else "باقي على صلاة $name"
+        NotificationHelper.showCountdown(context, label, target)
+
+        // التحديث التالي: عند دخول آخر ساعة (لتغيير الصيغة) أو عند وقت الصلاة
+        val remaining = target - now
+        val nextRefresh = if (remaining > 3_600_000L) target - 3_600_000L else target
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("type", AlarmReceiver.TYPE_COUNTDOWN)
         }
-        // يُشغَّل أول مرة قبل الصلاة القادمة بساعة - الحساب الدقيق داخل المستقبِل
-        exactAt(context, System.currentTimeMillis() + 30_000, pending(context, RQ_COUNTDOWN, intent))
-        // البيانات تُقرأ من الكاش داخل المستقبِل في كل مرة
+        exactAt(context, nextRefresh, pending(context, RQ_COUNTDOWN, intent))
     }
 
     private fun scheduleTasbih(context: Context, times: DayTimes, adhanMin: List<Int>,
@@ -168,20 +198,7 @@ object AlarmScheduler {
     }
 
     fun updatePersistentNow(context: Context, times: DayTimes) {
-        val now = java.util.Calendar.getInstance()
-        val nowMin = now.get(java.util.Calendar.HOUR_OF_DAY) * 60 +
-                now.get(java.util.Calendar.MINUTE)
-        val idx = PrayerUtils.nextPrayerIndex(times, nowMin)
-        val name = DayTimes.NAMES[idx]
-        val t = DayTimes.get(times, DayTimes.KEYS[idx])
-        val mins = PrayerUtils.toMinutes(t)
-        val diff = if (mins > nowMin) mins - nowMin else 0
-        val text = if (diff in 1..60) {
-            "الصلاة القادمة: $name بعد $diff دقيقة"
-        } else {
-            "الصلاة القادمة: $name - ${PrayerUtils.format12(t)}"
-        }
-        NotificationHelper.showPersistent(context, text)
+        refreshCountdown(context)
     }
 
     fun cancel(context: Context, requestCode: Int) {
