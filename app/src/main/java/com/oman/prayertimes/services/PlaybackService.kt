@@ -6,7 +6,7 @@ import android.os.IBinder
 import com.oman.prayertimes.notif.AudioPlayer
 import com.oman.prayertimes.notif.NotificationHelper
 
-/** خدمة تشغيل الأذان/المنبه - تبقى حية حتى مع قفل الشاشة */
+/** خدمة تشغيل الأذان/المنبه - تبقى حية حتى مع قفل الشاشة، وتتوقف عند انتهاء الصوت أو الإيقاف */
 class PlaybackService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -21,15 +21,16 @@ class PlaybackService : Service() {
         startForeground(NotificationHelper.NTF_PLAYBACK,
             NotificationHelper.playbackNotification(this, title))
 
-        // مدة التكرار: الملف يُقاس تلقائيًا - التكرار بعدد محدد بدون غفوة
-        AudioPlayer.play(this, sound, repeatCount = repeat, alarmStream = true)
+        // عند انتهاء الصوت أو ضغط الباور تتوقف الخدمة ويختفي الإشعار
+        AudioPlayer.play(this, sound, repeatCount = repeat, alarmStream = true,
+            onDone = { stopPlayback() })
 
         // إيقاف تلقائي بعد مهلة أمان (60 دقيقة) حال بقاء الخدمة عالقة
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             if (!AudioPlayer.isPlaying()) stopPlayback()
         }, 60 * 60 * 1000L)
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun stopPlayback() {
@@ -49,3 +50,4 @@ class PlaybackService : Service() {
         const val ACTION_STOP = "com.oman.prayertimes.STOP_PLAYBACK"
     }
 }
+

@@ -44,15 +44,21 @@ class AlarmReceiver : BroadcastReceiver() {
             TYPE_ADHAN -> {
                 val name = intent.getStringExtra("prayerName") ?: ""
                 val sound = intent.getStringExtra("sound") ?: ""
-                NotificationHelper.showEvent(context, NotificationHelper.CH_ALERTS,
-                    "حان الآن وقت صلاة $name", "تقبل الله طاعتكم", 1001)
-                // دخول وضع عدم الإزعاج
-                if (settings.dndEnabled) DndController.enter(context)
-                // تشغيل الأذان عبر خدمة مقدمة في المقدمة (يستمر رغم قفل الشاشة)
+                // 1) الأذان أولاً بدون أي تأخير (خدمة مقدمة تستمر رغم قفل الشاشة)
                 context.startForegroundService(Intent(context, PlaybackService::class.java).apply {
                     putExtra("sound", sound)
                     putExtra("title", "الأذان - صلاة $name")
                 })
+                // 2) الإشعار
+                NotificationHelper.showEvent(context, NotificationHelper.CH_ALERTS,
+                    "حان الآن وقت صلاة $name", "تقبل الله طاعتكم", 1001)
+                // 3) الصامت في خيط منفصل حتى لا يؤخر الأذان
+                if (settings.dndEnabled) {
+                    val pendingResult = goAsync()
+                    Thread {
+                        try { DndController.enter(context) } finally { pendingResult.finish() }
+                    }.start()
+                }
             }
             TYPE_DND_EXIT -> {
                 DndController.exit(context)

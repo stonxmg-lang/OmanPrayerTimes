@@ -94,12 +94,20 @@ object NotificationHelper {
         nm.notify(id, n)
     }
 
-    fun playbackNotification(context: Context, title: String): android.app.Notification =
-        NotificationCompat.Builder(context, CH_PLAYBACK)
+    fun playbackNotification(context: Context, title: String): android.app.Notification {
+        val stopIntent = android.app.PendingIntent.getService(
+            context, 9001,
+            Intent(context, com.oman.prayertimes.services.PlaybackService::class.java)
+                .setAction(com.oman.prayertimes.services.PlaybackService.ACTION_STOP),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Builder(context, CH_PLAYBACK)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setOngoing(true)
             .setContentIntent(openAppIntent(context))
+            .addAction(0, "إيقاف", stopIntent)
             .build()
+    }
 }
 
