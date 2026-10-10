@@ -56,10 +56,12 @@ object NotificationHelper {
         val remaining = targetMillis - System.currentTimeMillis()
         if (remaining <= 0) return
         val hours = remaining / 3_600_000L
+        // النظام يرسم أرقام العدّاد بلغة الجهاز، فنستخدم نفس نوع الصفر ليتناسق الشكل
+        val zero = String.format(java.util.Locale.getDefault(), "%d", 0)
         val format = when {
             hours >= 10 -> "%s"
-            hours >= 1 -> "0%s"
-            else -> "00:%s"
+            hours >= 1 -> "$zero%s"
+            else -> "$zero$zero:%s"
         }
         val rv = RemoteViews(context.packageName, R.layout.notif_countdown)
         rv.setTextViewText(R.id.notif_label, label)
