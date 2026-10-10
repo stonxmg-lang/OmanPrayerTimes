@@ -130,7 +130,8 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
     val nowMin = now.hour * 60 + now.minute
     val nextIdx = PrayerUtils.nextPrayerIndex(times, nowMin)
     val nextTimeStr = DayTimes.get(times, DayTimes.KEYS[nextIdx])
-    val nextAt = LocalDateTime.of(today, LocalTime.parse(nextTimeStr))
+    var nextAt = LocalDateTime.of(today, LocalTime.parse(nextTimeStr))
+    if (!nextAt.isAfter(now)) nextAt = nextAt.plusDays(1) // بعد العشاء: فجر الغد
     val secondsLeft = java.time.Duration.between(now, nextAt).seconds
 
     // بطاقة التاريخ
@@ -159,8 +160,8 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
 
     Spacer(Modifier.height(12.dp))
 
-    // بطاقة العد التنازلي (تظهر قبل الصلاة بساعة)
-    if (secondsLeft in 0..3600) {
+    // بطاقة العد التنازلي
+    if (secondsLeft > 0) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -170,12 +171,12 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
                 Modifier.fillMaxWidth().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("⏳ المتبقي على صلاة ${DayTimes.NAMES[nextIdx]}",
+                Text("⏳ باقي على صلاة ${DayTimes.NAMES[nextIdx]}",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    PrayerUtils.timeUntilString(secondsLeft),
+                    "\u200E" + PrayerUtils.formatCountdown(secondsLeft),
                     fontSize = 34.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary

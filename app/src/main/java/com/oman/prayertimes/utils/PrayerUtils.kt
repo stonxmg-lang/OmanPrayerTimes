@@ -37,6 +37,13 @@ object PrayerUtils {
         return 0 // tomorrow fajr
     }
 
+    /** عداد بصيغة 00:30:56 */
+    fun formatCountdown(totalSeconds: Long): String {
+        val t = if (totalSeconds < 0) 0 else totalSeconds
+        return String.format(java.util.Locale.US, "%02d:%02d:%02d",
+            t / 3600, (t % 3600) / 60, t % 60)
+    }
+
     fun timeUntilString(totalSeconds: Long): String {
         if (totalSeconds <= 0) return "الآن"
         val h = totalSeconds / 3600
