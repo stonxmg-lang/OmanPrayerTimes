@@ -6,9 +6,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -243,8 +241,8 @@ private fun LoadFailed(onRetry: () -> Unit) {
 private fun PrayerContent(times: DayTimes, tomorrow: DayTimes?, status: String, cityName: String, nowMin: Int) {
     Column(Modifier.fillMaxSize()) {
         PrayerHeader(cityName, times, tomorrow, nowMin)
-        PrayerTimerSection(times, tomorrow, nowMin)
-        PrayerList(times, nowMin, status)
+        PrayerTimerSection(times, tomorrow, nowMin, Modifier.weight(1f))
+        PrayerListCompact(times, nowMin)
     }
 }
 
@@ -256,7 +254,7 @@ private fun PrayerHeader(cityName: String, times: DayTimes, tomorrow: DayTimes?,
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -278,19 +276,19 @@ private fun PrayerHeader(cityName: String, times: DayTimes, tomorrow: DayTimes?,
             }
             Spacer(Modifier.weight(1f))
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             today.format(DateTimeFormatter.ofPattern("EEEE، d MMMM yyyy", Locale.forLanguageTag("ar-u-nu-latn"))),
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(PrayerUtils.hijriString(today),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.secondary)
+            color = MaterialTheme.colorScheme.secondary, fontSize = 11.sp)
     }
 }
 
 @Composable
-private fun PrayerTimerSection(times: DayTimes, tomorrow: DayTimes?, nowMin: Int) {
+private fun PrayerTimerSection(times: DayTimes, tomorrow: DayTimes?, nowMin: Int, modifier: Modifier = Modifier) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) { while (true) { now = LocalDateTime.now(); delay(1000) } }
 
@@ -322,71 +320,76 @@ private fun PrayerTimerSection(times: DayTimes, tomorrow: DayTimes?, nowMin: Int
     val intervalSec = ((target - prev) / 1000f).coerceAtLeast(1f)
     val elapsed = (1f - remainingSec / intervalSec).coerceIn(0f, 1f)
 
-    Column(
-        Modifier
+    Box(
+        modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(Modifier.size(160.dp), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            listOf(tint.copy(alpha = 0.20f), Color.Transparent),
-                            radius = 200f
-                        ), CircleShape
-                    )
-            )
-            CircularProgressIndicator(
-                progress = elapsed,
-                modifier = Modifier.size(160.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
-                strokeWidth = 8.dp
-            )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("الصلاة القادمة", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                Text(DayTimes.NAMES[nextIdx],
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Text(formatCountdown(remainingSec),
-                    style = MaterialTheme.typography.headlineSmall,
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(140.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                listOf(tint.copy(alpha = 0.18f), Color.Transparent),
+                                radius = 180f
+                            ), CircleShape
+                        )
+                )
+                CircularProgressIndicator(
+                    progress = elapsed,
+                    modifier = Modifier.size(140.dp),
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    strokeWidth = 7.dp
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("الصلاة القادمة", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                    Text(DayTimes.NAMES[nextIdx],
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(formatCountdown(remainingSec),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        Surface(
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            shape = RoundedCornerShape(50)
-        ) {
-            Text(
-                "الأذان " + PrayerUtils.format12(nextStr),
-                Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                fontSize = 13.sp
-            )
+            Spacer(Modifier.height(10.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(50)
+            ) {
+                Text(
+                    "الأذان " + PrayerUtils.format12(nextStr),
+                    Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontSize = 13.sp
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun PrayerList(times: DayTimes, nowMin: Int, status: String) {
+private fun PrayerListCompact(times: DayTimes, nowMin: Int) {
     val currentIdx = if (nowMin == 0) 5 else nextPrayerIndex(times, nowMin - 1) - 1
     val nextIdx = nextPrayerIndex(times, nowMin)
 
-    LazyColumn(
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        itemsIndexed(DayTimes.KEYS) { i, key ->
+        for (i in DayTimes.KEYS.indices) {
+            val key = DayTimes.KEYS[i]
             val isNext = i == nextIdx
             val isCurrent = i == currentIdx
             PrayerListRow(
@@ -396,15 +399,6 @@ private fun PrayerList(times: DayTimes, nowMin: Int, status: String) {
                 tint = RowTints[i],
                 isNext = isNext,
                 isCurrent = isCurrent
-            )
-        }
-        item {
-            Text(
-                status,
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
             )
         }
     }
