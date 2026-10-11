@@ -15,13 +15,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val OmanGreen     = Color(0xFF0E6B4F)
+val OmanGreen = Color(0xFF0E6B4F)
 val OmanGreenDark = Color(0xFF0A4A37)
-val OmanRed       = Color(0xFFB3372B)
-val OmanGold      = Color(0xFFC9A227)
-val Ivory         = Color(0xFFF5F3EE)
-val NightBg       = Color(0xFF101412)
-val NightCard     = Color(0xFF1A201D)
+val OmanRed = Color(0xFFB3372B)
+val OmanGold = Color(0xFFC9A227)
+val Ivory = Color(0xFFF5F3EE)
+val NightBg = Color(0xFF101412)
+val NightCard = Color(0xFF1A201D)
 
 private val LightColors = lightColorScheme(
     primary = OmanGreen,
@@ -62,26 +62,73 @@ private val DarkColors = darkColorScheme(
 )
 
 private val AppTypography = Typography(
+    headlineSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
+        fontSize = 20.sp,
+        lineHeight = 28.sp
+    ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold, fontSize = 28.sp),
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
+        fontSize = 28.sp,
+        lineHeight = 36.sp
+    ),
     titleLarge = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold, fontSize = 22.sp),
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
+        fontSize = 22.sp,
+        lineHeight = 28.sp
+    ),
     titleMedium = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 24.sp
+    ),
     titleSmall = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 16.sp),
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 16.sp,
+        lineHeight = 24.sp
+    ),
     bodyMedium = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 14.sp),
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp
+    ),
     labelLarge = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp
+    )
 )
 
 private val AppShapes = Shapes(
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp)
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(28.dp)
 )
 
 @Composable
@@ -94,4 +141,3 @@ fun OmanPrayerTheme(content: @Composable () -> Unit) {
         content = content
     )
 }
-// END OF FILE
