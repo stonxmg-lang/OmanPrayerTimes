@@ -31,8 +31,12 @@ object RawSounds {
 
     /** كل أسماء موارد raw (للانعكاس) */
     private fun rawNames(context: Context): List<String> = try {
-        Class.forName(context.packageName + ".R$raw").fields.map { it.name }
-    } catch (e: Exception) { emptyList() }
+        Class.forName("${context.packageName}.R\$raw")
+            .fields
+            .map { it.name }
+    } catch (_: Exception) {
+        emptyList()
+    }
 
     // ── المنبهات ────────────────────────────────────────────────
 
@@ -92,4 +96,3 @@ object RawSounds {
     fun tasbihCount(context: Context): Int =
         (1..10).count { exists(context, String.format(Locale.US, "tasbih_%02d", it)) }
 }
-// END OF FILE
