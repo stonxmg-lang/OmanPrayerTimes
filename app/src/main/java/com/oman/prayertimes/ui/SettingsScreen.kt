@@ -752,7 +752,8 @@ private fun DndCard() {
 
 @Composable
 private fun TasbihCard() {
-    val settings = remember { SettingsStore(LocalContext.current) }
+    val context = LocalContext.current
+    val settings = remember { SettingsStore(context) }
     var enabled by remember { mutableStateOf(settings.tasbihEnabled) }
     var count by remember { mutableStateOf(settings.tasbihCount) }
     var sound by remember { mutableStateOf(settings.tasbihSound) }
