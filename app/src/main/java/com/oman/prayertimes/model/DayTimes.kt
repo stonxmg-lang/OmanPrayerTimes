@@ -13,6 +13,9 @@ data class DayTimes(
         val KEYS = listOf("fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha")
         val NAMES = listOf("الفجر", "الشروق", "الظهر", "العصر", "المغرب", "العشاء")
         val ICONS = listOf("🌙", "🌅", "☀️", "🌤️", "🌇", "🌃")
+        val PRAYER_KEYS = listOf("fajr", "dhuhr", "asr", "maghrib", "isha")
+        val PRAYER_NAMES = listOf("الفجر", "الظهر", "العصر", "المغرب", "العشاء")
+
         fun get(times: DayTimes, key: String): String {
             val raw = when (key) {
                 "fajr" -> times.fajr; "sunrise" -> times.sunrise; "dhuhr" -> times.dhuhr
@@ -34,4 +37,4 @@ data class DayTimes(
         }
     }
 }
-
+// END OF FILE

@@ -4,13 +4,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mosque
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,7 +21,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.oman.prayertimes.ui.theme.OmanGreen
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
@@ -34,17 +34,21 @@ private val tabs = listOf(
 fun MainScreen() {
     val nav = rememberNavController()
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("مواقيت الصلاة - عُمان") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = OmanGreen,
-                    titleContentColor = androidx.compose.ui.graphics.Color.White
+            CenterAlignedTopAppBar(
+                title = {
+                    Text("مواقيت الصلاة", style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary)
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 val backStack by nav.currentBackStackEntryAsState()
                 val current = backStack?.destination?.route
                 tabs.forEach { tab ->

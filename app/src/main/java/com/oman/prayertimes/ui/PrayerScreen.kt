@@ -1,7 +1,6 @@
 package com.oman.prayertimes.ui
 
 import android.app.Activity
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
@@ -27,11 +27,13 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WbTwilight
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -70,58 +72,14 @@ import java.util.Locale
 
 private enum class LoadState { LOADING, OK, FAILED }
 
-/** لوحة الترويسة المتدرجة حسب وقت اليوم */
-private data class HeaderPalette(
-    val brush: Brush,
-    val content: Color,      // لون النصوص الأساسية فوق التدرج
-    val accent: Color,       // لون العدّاد واللمسات الذهبية
-    val lightStatusIcons: Boolean // أيقونات شريط الحالة داكنة (للخلفيات الفاتحة)
-)
-
-@Composable
-private fun headerPalette(nextKey: String, dark: Boolean): HeaderPalette = when (nextKey) {
-    // الفجر: أزرق فاتح مشرق (ضوء ما قبل الشروق)
-    "fajr" -> if (!dark) HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF8FBCE8), Color(0xFFC2DDF5), Color(0xFFEAF3FC))),
-        Color(0xFF16324F), Color(0xFF8A6D1A), true)
-    else HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF16273F), Color(0xFF1E3A5C), Color(0xFF12202F))),
-        Color.White, OmanGold, false)
-    // الشروق/الصباح: أزرق سماوي صافٍ مشرق
-    "sunrise" -> if (!dark) HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF6FB1E8), Color(0xFFA8D0F2), Color(0xFFE3F0FA))),
-        Color(0xFF12304E), Color(0xFF8A6D1A), true)
-    else HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF14304E), Color(0xFF1C4568), Color(0xFF122336))),
-        Color.White, OmanGold, false)
-    // الظهر: الأخضر العُماني
-    "dhuhr" -> if (!dark) HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF0B3D22), Color(0xFF046A38), Color(0xFF0E7A45))),
-        Color.White, OmanGold, false)
-    else HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF0A2016), Color(0xFF0E3524), Color(0xFF12402C))),
-        Color.White, OmanGold, false)
-    // العصر: كهرماني دافئ
-    "asr" -> if (!dark) HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFFE8B04B), Color(0xFFF2C878), Color(0xFFF9E4BC))),
-        Color(0xFF4A2E04), Color(0xFF7A4E00), true)
-    else HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF3A2C12), Color(0xFF4E3A18), Color(0xFF2E2410))),
-        Color(0xFFF5E3C0), OmanGold, false)
-    // المغرب: أصفر لامع (ساعة الغروب)
-    "maghrib" -> if (!dark) HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFFB300), Color(0xFFFF8F00))),
-        Color(0xFF3A2600), Color(0xFF6B4200), true)
-    else HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF4A3408), Color(0xFF6B4A0F), Color(0xFF33240A))),
-        Color(0xFFFFE9B8), OmanGold, false)
-    // العشاء/الليل: أزرق ليلي داكن
-    else -> if (!dark) HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF16294D), Color(0xFF1F3A66), Color(0xFF0E1B33))),
-        Color.White, OmanGold, false)
-    else HeaderPalette(
-        Brush.verticalGradient(listOf(Color(0xFF070F1E), Color(0xFF0D1D38), Color(0xFF050B16))),
-        Color.White, OmanGold, false)
+/** هالة لونية خفيفة حول العدّاد حسب فترة اليوم (لمسة فقط، لا تدرج صاخب) */
+private fun periodTint(nextKey: String, dark: Boolean): Color = when (nextKey) {
+    "fajr"    -> if (dark) Color(0xFF35507A) else Color(0xFF7FA8D9)
+    "sunrise" -> if (dark) Color(0xFF2E6690) else Color(0xFF5EA4DC)
+    "dhuhr"   -> if (dark) Color(0xFF2C6E54) else Color(0xFF4CAF7D)
+    "asr"     -> if (dark) Color(0xFF7A5A22) else Color(0xFFD9A441)
+    "maghrib" -> if (dark) Color(0xFF7C4E1D) else Color(0xFFE8912D)
+    else      -> if (dark) Color(0xFF2C3A66) else Color(0xFF6D7FB8)
 }
 
 private val RowIcons: List<ImageVector> = listOf(
@@ -129,8 +87,8 @@ private val RowIcons: List<ImageVector> = listOf(
     Icons.Default.LightMode, Icons.Default.WbTwilight, Icons.Default.NightsStay
 )
 private val RowTints: List<Color> = listOf(
-    Color(0xFF7986CB), Color(0xFFFFB74D), Color(0xFFFDD835),
-    Color(0xFFFFB300), Color(0xFFFF8A65), Color(0xFF5C6BC0)
+    Color(0xFF5C6BC0), Color(0xFFE0A13E), Color(0xFFE8C53A),
+    Color(0xFFD9932A), Color(0xFFE07B4F), Color(0xFF3F51B5)
 )
 
 @Composable
@@ -175,6 +133,17 @@ fun PrayerScreen() {
 
     OnResumeEffect { cityName = Cities.nameOf(settings.cityId) }
 
+    // شريط الحالة بنفس لون الخلفية (مرة واحدة)
+    val activity = LocalContext.current as? Activity
+    val view = LocalView.current
+    val dark = isSystemInDarkTheme()
+    LaunchedEffect(Unit) {
+        val w = activity?.window ?: return@LaunchedEffect
+        w.statusBarColor = android.graphics.Color.TRANSPARENT
+        WindowCompat.setDecorFitsSystemWindows(w, false)
+        WindowCompat.getInsetsController(w, view).isAppearanceLightStatusBars = !dark
+    }
+
     // إعادة التحميل عند تغيّر اليوم (بعد منتصف الليل)
     LaunchedEffect(Unit) {
         while (true) {
@@ -186,15 +155,12 @@ fun PrayerScreen() {
 
     LaunchedEffect(reloadKey) {
         val today = day
-
-        // 1) اعرض من الكاش فورًا بدون انتظار الشبكة
         val cached = withContext(Dispatchers.IO) {
             repo.getDay(repo.loadCache(), today.year, today.monthValue, today.dayOfMonth)
         }
         if (cached != null) { times = cached; state = LoadState.OK }
         else { times = null; state = LoadState.LOADING }
 
-        // 2) حدّث في الخلفية عند اللزوم
         val refreshed = withContext(Dispatchers.IO) {
             try { repo.refreshIfNeeded() } catch (e: Exception) { false }
         }
@@ -208,7 +174,7 @@ fun PrayerScreen() {
         tomorrow = tmr
 
         if (fresh == null) {
-            status = "تعذّر تحميل مواقيت $cityName - تحقق من الإنترنت ثم أعد المحاولة"
+            status = "تعذّر تحميل المواقيت - تحقق من الإنترنت"
             if (state != LoadState.OK) state = LoadState.FAILED
             return@LaunchedEffect
         }
@@ -217,13 +183,12 @@ fun PrayerScreen() {
 
         val age = withContext(Dispatchers.IO) { repo.cacheAgeDays(repo.loadCache(), today.year) } ?: 0
         status = when {
-            refreshed -> "تم تحديث المواقيت من وزارة الأوقاف والشؤون الدينية"
+            refreshed -> "تم التحديث من وزارة الأوقاف والشؤون الدينية"
             age == 0 -> "البيانات محدّثة اليوم"
             age < 25 -> "آخر تحديث منذ $age يوم"
-            else -> "البيانات قديمة (منذ $age يوم) - تعذّر الاتصال بالوزارة"
+            else -> "البيانات قديمة - تعذّر الاتصال بالوزارة"
         }
 
-        // 3) جدولة تنبيهات اليوم
         withContext(Dispatchers.IO) { AlarmScheduler.scheduleForDay(context, fresh, today) }
     }
 
@@ -232,22 +197,22 @@ fun PrayerScreen() {
         when {
             t == null && state == LoadState.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(12.dp))
-                    Text("جاري تحميل مواقيت $cityName…",
+                    Text("جاري تحميل المواقيت…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             t == null && state == LoadState.FAILED ->
-                LoadFailed(cityName) { state = LoadState.LOADING; reloadKey++ }
+                LoadFailed { state = LoadState.LOADING; reloadKey++ }
             t != null -> PrayerContent(t, tomorrow, status, cityName)
         }
     }
 }
 
 @Composable
-private fun LoadFailed(cityName: String, onRetry: () -> Unit) {
+private fun LoadFailed(onRetry: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -260,13 +225,12 @@ private fun LoadFailed(cityName: String, onRetry: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
-        androidx.compose.material3.Button(onClick = onRetry) { Text("إعادة المحاولة") }
+        Button(onClick = onRetry) { Text("إعادة المحاولة") }
     }
 }
 
 @Composable
 private fun PrayerContent(times: DayTimes, tomorrow: DayTimes?, status: String, cityName: String) {
-    // تحديث دقّة الدقائق فقط لتجنّب إعادة تركيب القائمة كل ثانية
     var nowMin by remember { mutableStateOf(currentMinute()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -277,7 +241,7 @@ private fun PrayerContent(times: DayTimes, tomorrow: DayTimes?, status: String, 
     }
     val nextIdx = nextPrayerIndex(times, nowMin)
     Column(Modifier.fillMaxSize()) {
-        NextPrayerHeader(times, tomorrow, cityName)
+        NextPrayerHero(times, tomorrow, cityName)
         PrayerList(times, nextIdx, status)
     }
 }
@@ -288,7 +252,7 @@ private fun currentMinute(): Int {
 }
 
 @Composable
-private fun NextPrayerHeader(times: DayTimes, tomorrow: DayTimes?, cityName: String) {
+private fun NextPrayerHero(times: DayTimes, tomorrow: DayTimes?, cityName: String) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) { while (true) { now = LocalDateTime.now(); delay(1000) } }
 
@@ -298,17 +262,7 @@ private fun NextPrayerHeader(times: DayTimes, tomorrow: DayTimes?, cityName: Str
     val nextIdx = nextPrayerIndex(times, nowMin)
     val nextKey = DayTimes.KEYS[nextIdx]
     val nextStr = DayTimes.get(times, nextKey)
-    val palette = headerPalette(nextKey, dark)
-
-    // مطابقة شريط حالة النظام مع لون الترويسة (عند تغيّر الفترة فقط، لا كل ثانية)
-    val activity = LocalContext.current as? Activity
-    val view = LocalView.current
-    LaunchedEffect(nextKey, dark) {
-        val w = activity?.window ?: return@LaunchedEffect
-        w.statusBarColor = android.graphics.Color.TRANSPARENT
-        WindowCompat.setDecorFitsSystemWindows(w, false)
-        WindowCompat.getInsetsController(w, view).isAppearanceLightStatusBars = palette.lightStatusIcons
-    }
+    val tint = periodTint(nextKey, dark)
 
     val target: Long
     val prev: Long
@@ -329,52 +283,93 @@ private fun NextPrayerHeader(times: DayTimes, tomorrow: DayTimes?, cityName: Str
     val targetLdt = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(target), zone)
     val remainingSec = java.time.Duration.between(now, targetLdt).seconds.coerceAtLeast(0)
     val intervalSec = ((target - prev) / 1000f).coerceAtLeast(1f)
-    val frac = (remainingSec / intervalSec).coerceIn(0f, 1f)
+    // الحلقة تمتلئ منذ بداية الفترة حتى الآن (تتحرك بوضوح)
+    val elapsed = (1f - remainingSec / intervalSec).coerceIn(0f, 1f)
 
-    Box(
+    Column(
         Modifier
             .fillMaxWidth()
-            .background(palette.brush)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.LocationOn, contentDescription = null,
-                    tint = palette.content, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(cityName, color = palette.content, style = MaterialTheme.typography.titleMedium)
-            }
-            Text(
-                today.format(DateTimeFormatter.ofPattern("EEEE، d MMMM yyyy", Locale.forLanguageTag("ar-u-nu-latn"))),
-                color = palette.content.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
-            Text(PrayerUtils.hijriString(today), color = palette.accent,
-                style = MaterialTheme.typography.bodySmall)
-
-            Spacer(Modifier.height(14.dp))
-
-            Box(Modifier.size(196.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    progress = frac,
-                    modifier = Modifier.size(196.dp),
-                    color = palette.content.copy(alpha = 0.28f),
-                    strokeWidth = 7.dp
-                )
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("باقي على صلاة", color = palette.content.copy(alpha = 0.75f), fontSize = 12.sp)
-                    Text(DayTimes.NAMES[nextIdx], color = palette.content,
-                        style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("\u200E" + formatCountdown(remainingSec),
-                        color = palette.accent, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        // المدينة + التاريخان
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(50)
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.LocationOn, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(cityName, style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
-
-            Spacer(Modifier.height(10.dp))
-            Text(PrayerUtils.format12(nextStr), color = palette.content.copy(alpha = 0.9f),
-                style = MaterialTheme.typography.bodyLarge)
         }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            today.format(DateTimeFormatter.ofPattern("EEEE، d MMMM yyyy", Locale.forLanguageTag("ar-u-nu-latn"))),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(PrayerUtils.hijriString(today),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary)
+
+        Spacer(Modifier.height(18.dp))
+
+        // العدّاد البطل: هالة لونية خفيفة + حلقة واضحة
+        Box(Modifier.size(238.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            listOf(tint.copy(alpha = 0.20f), Color.Transparent),
+                            radius = 260f
+                        ), CircleShape
+                    )
+            )
+            CircularProgressIndicator(
+                progress = elapsed,
+                modifier = Modifier.size(206.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                strokeWidth = 10.dp
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("الصلاة القادمة", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(DayTimes.NAMES[nextIdx],
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground)
+                Spacer(Modifier.height(2.dp))
+                Text("‎" + formatCountdown(remainingSec),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text(
+                        "الأذان " + PrayerUtils.format12(nextStr),
+                        Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
     }
 }
 
@@ -382,7 +377,7 @@ private fun NextPrayerHeader(times: DayTimes, tomorrow: DayTimes?, cityName: Str
 private fun PrayerList(times: DayTimes, nextIdx: Int, status: String) {
     val currentIdx = if (nextIdx == 0) 5 else nextIdx - 1
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         itemsIndexed(DayTimes.KEYS) { i, key ->
@@ -390,24 +385,26 @@ private fun PrayerList(times: DayTimes, nextIdx: Int, status: String) {
             val isCurrent = i == currentIdx
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                border = if (isNext) BorderStroke(1.5.dp, OmanGold) else null,
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isNext) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    containerColor = if (isNext) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = if (isNext) 3.dp else 1.dp
                 )
             ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         Modifier
-                            .size(42.dp)
+                            .size(44.dp)
                             .background(
-                                if (isNext) OmanGold.copy(alpha = 0.18f)
-                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                                RoundedCornerShape(12.dp)
+                                if (isNext) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(14.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -417,16 +414,27 @@ private fun PrayerList(times: DayTimes, nextIdx: Int, status: String) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(DayTimes.NAMES[i], style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal)
-                        if (isCurrent) Text("الصلاة الحالية", color = OmanGold, fontSize = 11.sp)
+                            fontWeight = if (isNext) FontWeight.Bold else FontWeight.Medium)
+                        if (isCurrent) {
+                            Text("الآن", color = MaterialTheme.colorScheme.secondary,
+                                fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(PrayerUtils.format12(DayTimes.get(times, key)),
                             style = MaterialTheme.typography.titleSmall,
                             color = if (isNext) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurface)
-                        if (isNext) Text("التالية", color = MaterialTheme.colorScheme.primary,
-                            fontSize = 11.sp)
+                        if (isNext) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(50)
+                            ) {
+                                Text("التالية", Modifier.padding(horizontal = 8.dp, vertical = 1.dp),
+                                    fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary)
+                            }
+                        }
                     }
                 }
             }
@@ -439,7 +447,6 @@ private fun PrayerList(times: DayTimes, nextIdx: Int, status: String) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(20.dp))
         }
     }
 }
