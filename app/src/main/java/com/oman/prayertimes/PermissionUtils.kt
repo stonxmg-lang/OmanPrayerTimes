@@ -8,10 +8,13 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 
 object PermissionUtils {
-    fun isNotificationPermissionRequired(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    fun isNotificationPermissionRequired(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     fun hasNotificationPermission(context: Context): Boolean =
-        !isNotificationPermissionRequired() || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        !isNotificationPermissionRequired() ||
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
 
     fun requestNotificationPermission(
         activity: ComponentActivity,

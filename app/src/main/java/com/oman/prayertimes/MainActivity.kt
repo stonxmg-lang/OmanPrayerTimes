@@ -1,22 +1,27 @@
 package com.oman.prayertimes
 
-import android.Manifest
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import com.oman.prayertimes.ui.MainScreen
 import com.oman.prayertimes.ui.theme.OmanPrayerTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var permissionLauncher: ActivityResultLauncher<String>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // إذن الإشعارات (أندرويد 13+)
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-                .launch(Manifest.permission.POST_NOTIFICATIONS)
+
+        permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                // Fallback remains safe: the app still runs, but users can enable the permission later.
+            }
         }
+
+        PermissionUtils.requestNotificationPermission(this, permissionLauncher)
+
         setContent {
             OmanPrayerTheme {
                 MainScreen()
