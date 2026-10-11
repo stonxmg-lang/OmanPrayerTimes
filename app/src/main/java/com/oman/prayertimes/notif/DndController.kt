@@ -16,6 +16,7 @@ import java.time.LocalDate
  * - يستخدم وضع "المنبهات فقط" (يسكّت المكالمات والإشعارات ويبقي الأذان والمنبهات).
  * - يحفظ الوضع السابق مرة واحدة فقط، ولا يلمس الوضع إن كان الجهاز أصلاً في عدم إزعاج.
  * - reconcile() تصحّح الحالة (تدخل/تخرج) حسب الوقت الحالي حتى لو ضاع منبه الدخول أو الخروج.
+ * - الدخول والخروج عبر منبهات مستقلة (TYPE_DND_ENTER/TYPE_DND_EXIT) يجدولها AlarmScheduler.
  */
 object DndController {
     private const val TAG = "DndController"
@@ -36,8 +37,10 @@ object DndController {
         val repo = PrayerRepository(context)
         val d = LocalDate.now()
         val times = repo.getDay(repo.loadCache(), d.year, d.monthValue, d.dayOfMonth) ?: return null
+        val settings = SettingsStore(context)
         for (key in DayTimes.KEYS) {
-            val minutes = AlarmScheduler.DND_EXIT_MINUTES[key] ?: continue
+            if (key == "sunrise") continue
+            val minutes = AlarmScheduler.dndExitMinutes(settings, key, d)
             val start = PrayerUtils.calendarForToday(DayTimes.get(times, key), d)
             val end = start + minutes * 60_000L
             if (now in start until end) return end
@@ -50,6 +53,7 @@ object DndController {
         val until = windowEnd(context, now) ?: (now + 30 * 60_000L)
         val sp = context.getSharedPreferences(SP, Context.MODE_PRIVATE)
 
+        if (!SettingsStore(context).dndEnabled) return
         if (!hasAccess(context)) {
             Log.w(TAG, "لم يدخل الصامت: إذن عدم الإزعاج غير ممنوح")
             return
@@ -98,6 +102,9 @@ object DndController {
         }
     }
 
+    /** يُستدعى عند تعطيل الإعداد من صفحة الإعدادات */
+    fun onSettingDisabled(context: Context) = exit(context)
+
     /** تصحيح الحالة حسب الوقت: تُستدعى عند فتح التطبيق والإقلاع وكل 6 ساعات */
     fun reconcile(context: Context) {
         val settings = SettingsStore(context)
@@ -110,4 +117,4 @@ object DndController {
         if (settings.dndEnabled && windowEnd(context, now) != null) enter(context)
     }
 }
-
+// END OF FILE

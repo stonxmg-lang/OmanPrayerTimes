@@ -19,6 +19,7 @@ object NotificationHelper {
 
     const val NTF_PERSIST = 1
     const val NTF_PLAYBACK = 2
+    const val NTF_FAJR_FULLSCREEN = 1002
 
     fun createChannels(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -30,6 +31,38 @@ object NotificationHelper {
             NotificationManager.IMPORTANCE_LOW).apply { description = "عرض الصلاة القادمة في شريط الإشعارات" })
         nm.createNotificationChannel(NotificationChannel(CH_PLAYBACK, "تشغيل الصوت",
             NotificationManager.IMPORTANCE_LOW).apply { description = "إشعار تشغيل الأذان والمنبه" })
+    }
+
+    /** هل يُسمح للتطبيق بإشعارات ملء الشاشة؟ (أندرويد 14+) */
+    fun canFullScreen(context: Context): Boolean {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return android.os.Build.VERSION.SDK_INT < 34 || nm.canUseFullScreenIntent()
+    }
+
+    /** إشعار منبه بملء الشاشة فوق شاشة القفل (بدل فتح Activity من الخلفية) */
+    fun showFullScreen(context: Context, title: String, text: String) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val pi = PendingIntent.getActivity(context, NTF_FAJR_FULLSCREEN,
+            Intent(context, com.oman.prayertimes.ui.AlarmActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val n = NotificationCompat.Builder(context, CH_ALERTS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(pi, true)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setContentIntent(pi)
+            .build()
+        nm.notify(NTF_FAJR_FULLSCREEN, n)
+    }
+
+    fun cancelFullScreen(context: Context) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(NTF_FAJR_FULLSCREEN)
     }
 
     private fun openAppIntent(context: Context): PendingIntent =
@@ -110,4 +143,4 @@ object NotificationHelper {
             .build()
     }
 }
-
+// END OF FILE

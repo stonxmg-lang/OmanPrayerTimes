@@ -3,6 +3,7 @@ package com.oman.prayertimes.services
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import com.oman.prayertimes.data.SettingsStore
 import com.oman.prayertimes.notif.AudioPlayer
 import com.oman.prayertimes.notif.NotificationHelper
 
@@ -14,16 +15,24 @@ class PlaybackService : Service() {
             stopPlayback()
             return START_NOT_STICKY
         }
-        val sound = intent?.getStringExtra("sound") ?: "adhan_fajr"
-        val title = intent?.getStringExtra("title") ?: "الأذان"
-        val repeat = intent?.getIntExtra("repeat", 1) ?: 1
+
+        // نتجاهل أي intent بلا اسم صوت صريح (لا نغذي نغمة افتراضية)
+        val sound = intent?.getStringExtra("sound")
+        if (sound.isNullOrEmpty()) {
+            stopPlayback()
+            return START_NOT_STICKY
+        }
+        val title = intent.getStringExtra("title") ?: "الأذان"
+        val repeat = intent.getIntExtra("repeat", 1)
 
         startForeground(NotificationHelper.NTF_PLAYBACK,
             NotificationHelper.playbackNotification(this, title))
 
-        // عند انتهاء الصوت أو ضغط الباور تتوقف الخدمة ويختفي الإشعار
+        val volume = SettingsStore(this).adhanVolume / 100f
+
+        // عند انتهاء الصوت أو ضغط الباور تتوقف الخدمة ويختفي إشعارا التشغيل وملء الشاشة
         AudioPlayer.play(this, sound, repeatCount = repeat, alarmStream = true,
-            onDone = { stopPlayback() })
+            volume = volume, onDone = { stopPlayback() })
 
         // إيقاف تلقائي بعد مهلة أمان (60 دقيقة) حال بقاء الخدمة عالقة
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
@@ -35,6 +44,7 @@ class PlaybackService : Service() {
 
     private fun stopPlayback() {
         AudioPlayer.stop()
+        NotificationHelper.cancelFullScreen(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -50,4 +60,4 @@ class PlaybackService : Service() {
         const val ACTION_STOP = "com.oman.prayertimes.STOP_PLAYBACK"
     }
 }
-
+// END OF FILE

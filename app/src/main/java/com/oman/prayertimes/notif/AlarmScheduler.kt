@@ -4,12 +4,15 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import com.oman.prayertimes.data.Cities
 import com.oman.prayertimes.data.PrayerRepository
+import com.oman.prayertimes.data.RawSounds
 import com.oman.prayertimes.data.SettingsStore
 import com.oman.prayertimes.data.TasbihTexts
 import com.oman.prayertimes.model.DayTimes
 import com.oman.prayertimes.receivers.AlarmReceiver
 import com.oman.prayertimes.utils.PrayerUtils
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 object AlarmScheduler {
@@ -24,10 +27,18 @@ object AlarmScheduler {
     const val ALERT_LEAD_FAJR = 5      // تنبيه الفجر قبل 5 دقائق
     const val ALERT_LEAD_OTHER = 10    // بقية الصلوات قبل 10 دقائق
 
-    // مدة بقاء وضع عدم الإزعاج بعد كل صلاة (دقائق) - الشروق مستثنى
-    val DND_EXIT_MINUTES = mapOf(
-        "fajr" to 45, "dhuhr" to 35, "asr" to 35, "maghrib" to 25, "isha" to 35
-    )
+    /** مدة بقاء وضع عدم الإزعاج بعد الظهر يوم الجمعة (قابلة للتعديل من الإعدادات) */
+    private const val FRIDAY_KEY = "dhuhr"
+
+    /**
+     * مدة الصامت بعد كل صلاة بالدقائق: من إعدادات المستخدم،
+     * ويوم الجمعة تُستخدم مدة خاصة أطول لصلاة الظهر.
+     */
+    fun dndExitMinutes(settings: SettingsStore, key: String, date: LocalDate): Int =
+        if (key == FRIDAY_KEY && date.dayOfWeek == DayOfWeek.FRIDAY)
+            settings.dndFridayMinutes
+        else
+            settings.dndMinutes(key)
 
     private fun pending(context: Context, requestCode: Int, intent: Intent): PendingIntent =
         PendingIntent.getBroadcast(context, requestCode, intent,
@@ -61,7 +72,7 @@ object AlarmScheduler {
         // 1) تنبيه قبل الصلاة + 2) الأذان + 3) خروج DND
         for (i in keys.indices) {
             val key = keys[i]
-            if (key == "sunrise") continue // الشروق: لا تنبيه ولا DND
+            if (key == "sunrise") continue // الشروق: لا تنبيه ولا أذان ولا DND
             val adhan = adhanMin[i]
 
             // منبه الفجر (قبل الأذان بعدد دقائق محدد)
@@ -73,7 +84,7 @@ object AlarmScheduler {
                         putExtra("type", AlarmReceiver.TYPE_FAJR_ALARM)
                     }
                     exactAt(context, PrayerUtils.calendarForToday(
-                        "%02d:%02d".format(fajrAlarmMinute / 60, fajrAlarmMinute % 60), date),
+                        String.format(java.util.Locale.US, "%02d:%02d", fajrAlarmMinute / 60, fajrAlarmMinute % 60), date),
                         pending(context, RQ_FAJR_ALARM, intent))
                 }
             }
@@ -92,47 +103,55 @@ object AlarmScheduler {
                         putExtra("prayerName", DayTimes.NAMES[i])
                     }
                     exactAt(context, PrayerUtils.calendarForToday(
-                        "%02d:%02d".format(alertMin / 60, alertMin % 60), date),
+                        String.format(java.util.Locale.US, "%02d:%02d", alertMin / 60, alertMin % 60), date),
                         pending(context, RQ_ALERT_BASE + i, intent))
                 } else {
                     cancel(context, RQ_ALERT_BASE + i)
                 }
             } else cancel(context, RQ_ALERT_BASE + i)
 
-            // الأذان
-            val adhanIntent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra("type", AlarmReceiver.TYPE_ADHAN)
-                putExtra("prayerIndex", i)
-                putExtra("sound", "adhan_$key")
-                putExtra("prayerName", DayTimes.NAMES[i])
+            // الأذان — يُحترم إعداد تشغيل/إيقاف كل صلاة، وصوت المؤذن المختار
+            if (settings.adhanEnabled(key)) {
+                val adhanIntent = Intent(context, AlarmReceiver::class.java).apply {
+                    putExtra("type", AlarmReceiver.TYPE_ADHAN)
+                    putExtra("prayerIndex", i)
+                    putExtra("sound", RawSounds.adhanSoundFor(key, settings.adhanVoice))
+                    putExtra("prayerName", DayTimes.NAMES[i])
+                }
+                exactAt(context, PrayerUtils.calendarForToday(DayTimes.get(times, key), date),
+                    pending(context, RQ_ADHAN_BASE + i, adhanIntent))
+            } else {
+                cancel(context, RQ_ADHAN_BASE + i)
             }
-            exactAt(context, PrayerUtils.calendarForToday(DayTimes.get(times, key), date),
-                pending(context, RQ_ADHAN_BASE + i, adhanIntent))
 
             // خروج DND
-            DND_EXIT_MINUTES[key]?.let { exitMin ->
-                val exitAt = adhan + exitMin
-                val exitIntent = Intent(context, AlarmReceiver::class.java).apply {
-                    putExtra("type", AlarmReceiver.TYPE_DND_EXIT)
-                }
-                exactAt(context, PrayerUtils.calendarForToday(
-                    "%02d:%02d".format(exitAt / 60, exitAt % 60), date),
-                    pending(context, RQ_DND_BASE + i, exitIntent))
+            val exitMin = dndExitMinutes(settings, key, date)
+            val exitAt = adhan + exitMin
+            val exitIntent = Intent(context, AlarmReceiver::class.java).apply {
+                putExtra("type", AlarmReceiver.TYPE_DND_EXIT)
             }
+            exactAt(context, PrayerUtils.calendarForToday(
+                String.format(java.util.Locale.US, "%02d:%02d", exitAt / 60, exitAt % 60), date),
+                pending(context, RQ_DND_BASE + i, exitIntent))
         }
 
         // 4) العد التنازلي في الستار (يبدأ قبل الصلاة بساعة)
-        scheduleCountdownChain(context, times, date)
+        refreshCountdown(context)
 
         // 5) تذكيرات الصلاة على النبي - موزعة بين الفجر والعشاء
         scheduleTasbih(context, times, adhanMin, date, settings)
-
-        // إشعار الستار الأساسي
-        updatePersistentNow(context, times)
     }
 
-    fun scheduleCountdownChain(context: Context, times: DayTimes, date: LocalDate) {
-        refreshCountdown(context)
+    /**
+     * يعيد جدولة تنبيهات اليوم الحالي بعد أي تغيير في الإعدادات
+     * (منبه الفجر، التنبيهات، الأذان، الصامت، التسبيح، تغيير المدينة…)
+     */
+    fun rescheduleToday(context: Context) {
+        val repo = PrayerRepository(context)
+        val today = LocalDate.now()
+        val times = repo.getDay(repo.loadCache(), today.year, today.monthValue, today.dayOfMonth)
+            ?: return
+        scheduleForDay(context, times, today)
     }
 
     /** يعرض في الستار عدّادًا تنازليًّا حيًّا للصلاة القادمة ويجدول التحديث التالي */
@@ -182,7 +201,7 @@ object AlarmScheduler {
         val interval = (ishaMin - fajrMin).toDouble() / (n + 1)
         val windows = DayTimes.KEYS.indices
             .filter { DayTimes.KEYS[it] != "sunrise" }
-            .map { adhanMin[it]..(adhanMin[it] + (DND_EXIT_MINUTES[DayTimes.KEYS[it]] ?: 30)) }
+            .map { adhanMin[it]..(adhanMin[it] + dndExitMinutes(settings, DayTimes.KEYS[it], date)) }
 
         var scheduled = 0
         for (k in 1..n) {
@@ -194,14 +213,10 @@ object AlarmScheduler {
                 putExtra("tasbihIndex", idx)
             }
             exactAt(context, PrayerUtils.calendarForToday(
-                "%02d:%02d".format(t / 60, t % 60), date),
+                String.format(java.util.Locale.US, "%02d:%02d", t / 60, t % 60), date),
                 pending(context, RQ_TASBIH_BASE + scheduled, intent))
             scheduled++
         }
-    }
-
-    fun updatePersistentNow(context: Context, times: DayTimes) {
-        refreshCountdown(context)
     }
 
     fun cancel(context: Context, requestCode: Int) {
@@ -221,4 +236,3 @@ object AlarmScheduler {
         cancel(context, RQ_COUNTDOWN); cancel(context, RQ_FAJR_ALARM)
     }
 }
-

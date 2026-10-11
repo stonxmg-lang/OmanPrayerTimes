@@ -31,6 +31,7 @@ object AudioPlayer {
         rawName: String,
         repeatCount: Int = 1,
         alarmStream: Boolean = true,
+        volume: Float = 1f,
         onDone: (() -> Unit)? = null
     ) {
         stop()
@@ -53,6 +54,7 @@ object AudioPlayer {
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
             )
+            mp.setVolume(volume.coerceIn(0f, 1f), volume.coerceIn(0f, 1f))
             mp.setOnCompletionListener {
                 remainingLoops--
                 if (remainingLoops > 0) { it.seekTo(0); it.start() }
@@ -108,4 +110,4 @@ object AudioPlayer {
         registeredOn = null
     }
 }
-
+// END OF FILE
