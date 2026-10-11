@@ -671,8 +671,7 @@ private fun AlarmSoundDialog(current: String, onDismiss: () -> Unit,
         title = { Text("نغمة المنبه - ▶ للمعاينة") },
         text = {
             if (alarms.isEmpty()) {
-                Text("لم تُضف ملفات منبهات بعد.
-ضع alarm_01.ogg … في app/src/main/res/raw",
+                Text("لم تُضف ملفات منبهات بعد - ضع alarm_01.ogg … في app/src/main/res/raw",
                     style = MaterialTheme.typography.bodyMedium)
             } else {
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
@@ -714,7 +713,7 @@ private fun DndCard() {
     var dnd by remember { mutableStateOf(settings.dndEnabled) }
 
     SectionCard(Icons.Default.VolumeOff, "الصامت تلقائيًا أثناء الصلاة") {
-        SwitchRow("تفعيل الصامت أثناء الصلاة (وضع "المنبهات فقط")", dnd) { v ->
+        SwitchRow("تفعيل الصامت أثناء الصلاة (وضع \"المنبهات فقط\")", dnd) { v ->
             dnd = v; settings.dndEnabled = v
             if (!v) DndController.onSettingDisabled(context)
             reschedule(context, scope)
