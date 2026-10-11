@@ -29,6 +29,10 @@ import com.oman.prayertimes.data.Cities
 import com.oman.prayertimes.data.SettingsStore
 import com.oman.prayertimes.data.TasbihTexts
 import com.oman.prayertimes.notif.DndController
+import com.oman.prayertimes.data.PrayerRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +96,9 @@ fun SettingsScreen() {
 private fun CityPicker(settings: SettingsStore) {
     var expanded by remember { mutableStateOf(false) }
     val cityName = Cities.nameOf(settings.cityId)
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var syncMsg by remember { mutableStateOf("") }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = cityName,
@@ -105,10 +112,26 @@ private fun CityPicker(settings: SettingsStore) {
             Cities.list.forEach { (name, id) ->
                 DropdownMenuItem(
                     text = { Text(name) },
-                    onClick = { settings.cityId = id; expanded = false }
+                    onClick = {
+                        settings.cityId = id
+                        expanded = false
+                        syncMsg = "جاري تحديث مواقيت $name…"
+                        scope.launch {
+                            val ok = withContext(Dispatchers.IO) {
+                                try { PrayerRepository(ctx).applyCityChange() } catch (e: Exception) { false }
+                            }
+                            syncMsg = if (ok) "✅ تم تحديث المواقيت والتنبيهات لمدينة $name"
+                            else "⚠️ تعذّر تحميل مواقيت $name - تأكد من الإنترنت"
+                        }
+                    }
                 )
             }
         }
+    }
+    if (syncMsg.isNotEmpty()) {
+        Text(syncMsg, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp))
     }
     Spacer(Modifier.height(8.dp))
     AutoLocationButton(settings)
@@ -284,3 +307,4 @@ private fun TasbihSection(settings: SettingsStore) {
         }
     }
 }
+

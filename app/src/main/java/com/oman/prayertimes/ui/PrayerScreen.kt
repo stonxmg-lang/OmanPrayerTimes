@@ -29,83 +29,85 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private enum class LoadState { LOADING, OK, FAILED }
+
 @Composable
 fun PrayerScreen() {
     val context = LocalContext.current
     val repo = remember { PrayerRepository(context) }
     val settings = remember { SettingsStore(context) }
-    val scope = rememberCoroutineScope()
 
     var times by remember { mutableStateOf<DayTimes?>(null) }
-    var online by remember { mutableStateOf(false) }
-    var noData by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf(LoadState.LOADING) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
-    var isLoading by remember { mutableStateOf(true) }
+    var day by remember { mutableStateOf(LocalDate.now()) }
+    var reloadKey by remember { mutableStateOf(0) }
 
-    // ساعة مُحدِّثة كل ثانية للعد التنازلي
+    // ساعة مُحدِّثة كل ثانية للعد التنازلي، وإعادة التحميل عند تغيّر اليوم (بعد منتصف الليل)
     LaunchedEffect(Unit) {
-        while (true) { now = LocalDateTime.now(); delay(1000) }
+        while (true) {
+            val n = LocalDateTime.now()
+            now = n
+            if (n.toLocalDate() != day) { day = n.toLocalDate(); reloadKey++ }
+            delay(1000)
+        }
     }
 
-    LaunchedEffect(Unit) {
-        val today = LocalDate.now()
-        var cache = repo.loadCache()
-        val net = repo.hasInternet()
-        var t: DayTimes? = null
-        if (net) {
-            t = repo.fetchDay(today.year, today.monthValue, today.dayOfMonth, settings.cityId)
+    LaunchedEffect(reloadKey) {
+        val today = day
+
+        // 1) اعرض من الكاش فورًا بدون انتظار الشبكة
+        val cached = withContext(Dispatchers.IO) {
+            repo.getDay(repo.loadCache(), today.year, today.monthValue, today.dayOfMonth)
         }
-        if (t != null) {
-            online = true
-        } else {
-            t = repo.getDay(cache, today.year, today.monthValue, today.dayOfMonth)
+        if (cached != null) { times = cached; state = LoadState.OK }
+        else { times = null; state = LoadState.LOADING }
+
+        // 2) حدّث في الخلفية عند اللزوم (لا يعطّل الواجهة)
+        val refreshed = withContext(Dispatchers.IO) {
+            try { repo.refreshIfNeeded() } catch (e: Exception) { false }
         }
-        times = t
-        isLoading = false
-        if (t == null && !cache.containsKey(today.year.toString())) {
-            noData = true // سنة جديدة بدون كاش
+        val fresh = withContext(Dispatchers.IO) {
+            repo.getDay(repo.loadCache(), today.year, today.monthValue, today.dayOfMonth)
+        }
+        if (fresh == null) { state = LoadState.FAILED; return@LaunchedEffect }
+        times = fresh
+        state = LoadState.OK
+
+        val age = withContext(Dispatchers.IO) { repo.cacheAgeDays(repo.loadCache(), today.year) } ?: 0
+        status = when {
+            refreshed -> "🟢 تم تحديث المواقيت من mara.gov.om"
+            age == 0 -> "🟢 البيانات محدّثة اليوم"
+            age < 25 -> "🟢 بيانات محفوظة (آخر تحديث منذ $age يوم)"
+            else -> "🟠 بيانات قديمة (منذ $age يوم) - تعذّر التحديث"
         }
 
-        // تحديث الخلفية: السنة الحالية كل 25 يوم + السنة الجديدة في آخر 10 أيام من نوفمبر
-        scope.launch(Dispatchers.IO) {
-            var changed = false
-            val years = mutableListOf<Int>()
-            if (repo.shouldRefreshYear(cache, today.year)) years.add(today.year)
-            if (today.monthValue == 11 && today.dayOfMonth >= 21 &&
-                repo.shouldRefreshYear(cache, today.year + 1)) {
-                years.add(today.year + 1)
-            }
-            for (y in years) {
-                val days = repo.fetchYear(y, settings.cityId)
-                if (days.isNotEmpty()) {
-                    cache[y.toString()] = PrayerRepository.YearCache(LocalDateTime.now().toString(), days)
-                    changed = true
-                }
-            }
-            if (repo.cleanupOldYears(cache)) changed = true
-            if (changed) repo.saveCache(cache)
-
-            val todayTimes = t ?: repo.getDay(cache, today.year, today.monthValue, today.dayOfMonth)
-            if (todayTimes != null) {
-                AlarmScheduler.scheduleForDay(context, todayTimes, today)
-            }
-        }
+        // 3) جدولة تنبيهات اليوم
+        withContext(Dispatchers.IO) { AlarmScheduler.scheduleForDay(context, fresh, today) }
     }
 
     val t = times
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         when {
-            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+            state == LoadState.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(12.dp))
+                    Text("جاري تحميل مواقيت ${Cities.nameOf(settings.cityId)}…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            noData || t == null -> NewYearMessage()
-            else -> PrayerContent(t, now, online)
+            state == LoadState.FAILED || t == null ->
+                LoadFailed(Cities.nameOf(settings.cityId)) { state = LoadState.LOADING; reloadKey++ }
+            else -> PrayerContent(t, now, status)
         }
     }
 }
 
 @Composable
-private fun NewYearMessage() {
+private fun LoadFailed(cityName: String, onRetry: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -113,19 +115,21 @@ private fun NewYearMessage() {
     ) {
         Text("⚠️", fontSize = 56.sp)
         Spacer(Modifier.height(16.dp))
-        Text("بدأت سنة جديدة - لا توجد بيانات محفوظة",
+        Text("تعذّر تحميل مواقيت $cityName",
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text("يرجى الاتصال بالإنترنت لتحديث مواقيت الصلاة",
+        Text("تأكد من الاتصال بالإنترنت ثم أعد المحاولة",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry) { Text("إعادة المحاولة") }
     }
 }
 
 @Composable
-private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) {
+private fun PrayerContent(times: DayTimes, now: LocalDateTime, status: String) {
     val today = LocalDate.now()
     val nowMin = now.hour * 60 + now.minute
     val nextIdx = PrayerUtils.nextPrayerIndex(times, nowMin)
@@ -222,8 +226,7 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
         }
         item {
             Text(
-                if (online) "🟢 متصل - بيانات مباشرة من mara.gov.om"
-                else "🟠 غير متصل - بيانات من الذاكرة",
+                status,
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -232,4 +235,5 @@ private fun PrayerContent(times: DayTimes, now: LocalDateTime, online: Boolean) 
         }
     }
 }
+
 
