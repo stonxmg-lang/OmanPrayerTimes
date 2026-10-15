@@ -27,16 +27,14 @@ class AlarmReceiver : BroadcastReceiver() {
         val settings = SettingsStore(context)
         when (intent.getStringExtra("type")) {
             TYPE_ALERT -> {
+                // Only show a notification for the pre-prayer alert. Do NOT start playback here
+                // so the adhan is only played once at the exact prayer time.
                 val name = intent.getStringExtra("prayerName") ?: ""
                 val sound = intent.getStringExtra("sound") ?: ""
                 val lead = if (sound.contains("fajr")) "5" else "10"
                 NotificationHelper.showEvent(context, NotificationHelper.CH_ALERTS,
                     "اقترب وقت صلاة $name",
                     "بقي $lead دقائق على الأذان", 1000)
-                context.startForegroundService(Intent(context, PlaybackService::class.java).apply {
-                    putExtra("sound", sound)
-                    putExtra("title", "تنبيه قبل صلاة $name")
-                })
             }
             TYPE_ADHAN -> {
                 val name = intent.getStringExtra("prayerName") ?: ""
@@ -46,7 +44,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     putExtra("title", "الأذان - صلاة $name")
                 })
                 NotificationHelper.showEvent(context, NotificationHelper.CH_ALERTS,
-                    "حان الآن وقت صلاة $name", "تقبل الله طاعتكم", 1001)
+                    "حان ال��ن وقت صلاة $name", "تقبل الله طاعتكم", 1001)
             }
             TYPE_DND_ENTER -> DndController.enter(context)
             TYPE_DND_EXIT -> DndController.exit(context)
