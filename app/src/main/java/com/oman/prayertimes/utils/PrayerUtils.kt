@@ -32,6 +32,19 @@ object PrayerUtils {
         return 0
     }
 
+    /**
+     * الصلاة الجارية الآن: آخر وقت مرّ اليوم. قبل الفجر تكون العشاء (من الليلة السابقة).
+     * بين الشروق والظهر لا توجد صلاة جارية (-1).
+     */
+    fun currentPrayerIndex(times: DayTimes, nowMinutes: Int): Int {
+        var idx = -1
+        for (i in DayTimes.KEYS.indices) {
+            if (toMinutes(DayTimes.get(times, DayTimes.KEYS[i])) <= nowMinutes) idx = i
+        }
+        if (idx == -1) return DayTimes.KEYS.lastIndex
+        return if (DayTimes.KEYS[idx] == "sunrise") -1 else idx
+    }
+
     fun formatCountdown(totalSeconds: Long): String {
         val t = if (totalSeconds < 0) 0 else totalSeconds
         return String.format(java.util.Locale.US, "%02d:%02d:%02d", t / 3600, (t % 3600) / 60, t % 60)

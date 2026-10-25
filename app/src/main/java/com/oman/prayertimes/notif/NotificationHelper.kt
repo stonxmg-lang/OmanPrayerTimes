@@ -3,66 +3,65 @@ package com.oman.prayertimes.notif
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.SystemClock
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.oman.prayertimes.MainActivity
 import com.oman.prayertimes.R
+import com.oman.prayertimes.utils.PrayerUtils
 
 object NotificationHelper {
-    const val CH_ALERTS = "prayer_alerts"
-    const val CH_TASBIH = "tasbih"
+    /** قناة التنبيه قبل الصلاة — صوتها ملف res/raw/prealert */
+    const val CH_PREALERT = "prayer_prealert_v2"
+    /** قناة تذكيرات الذكر — صامتة، والصوت (إن فُعّل) يشغّله AudioPlayer */
+    const val CH_TASBIH = "tasbih_v2"
     const val CH_PERSIST = "persistent"
-    const val CH_PLAYBACK = "playback"
+
+    /** قنوات الإصدارات السابقة (الأذان والمنبه) — تُحذف عند التشغيل */
+    private val LEGACY_CHANNELS = listOf("prayer_alerts", "playback", "tasbih")
 
     const val NTF_PERSIST = 1
-    const val NTF_PLAYBACK = 2
-    const val NTF_FAJR_FULLSCREEN = 1002
+    private const val NTF_PREALERT = 1000
+    private const val NTF_TASBIH_BASE = 2000
+
+    private val BRAND_GREEN = 0xFF0B6E4F.toInt()
+
+    private fun nm(context: Context) =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    private fun prealertSoundUri(context: Context): Uri =
+        Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.raw.prealert}")
 
     fun createChannels(context: Context) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(NotificationChannel(CH_ALERTS, "تنبيهات الصلاة",
-            NotificationManager.IMPORTANCE_HIGH).apply { description = "الأذان والتنبيه قبل الصلاة" })
+        val nm = nm(context)
+        LEGACY_CHANNELS.forEach { id -> try { nm.deleteNotificationChannel(id) } catch (_: Exception) {} }
+
+        nm.createNotificationChannel(NotificationChannel(CH_PREALERT, "التنبيه قبل الصلاة",
+            NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "إشعار بصوت قبل موعد الأذان"
+            setSound(prealertSoundUri(context), AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build())
+            enableVibration(true)
+            enableLights(true)
+            lightColor = BRAND_GREEN
+        })
         nm.createNotificationChannel(NotificationChannel(CH_TASBIH, "التذكير بالذكر",
-            NotificationManager.IMPORTANCE_DEFAULT).apply { description = "تذكيرات الصلاة على النبي والأذكار" })
+            NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "تذكيرات الصلاة على النبي ﷺ والأذكار"
+            setSound(null, null)
+        })
         nm.createNotificationChannel(NotificationChannel(CH_PERSIST, "الشريط الدائم",
-            NotificationManager.IMPORTANCE_LOW).apply { description = "عرض الصلاة القادمة في شريط الإشعارات" })
-        nm.createNotificationChannel(NotificationChannel(CH_PLAYBACK, "تشغيل الصوت",
-            NotificationManager.IMPORTANCE_LOW).apply { description = "إشعار تشغيل الأذان والمنبه" })
-    }
-
-    /** هل يُسمح للتطبيق بإشعارات ملء الشاشة؟ (أندرويد 14+) */
-    fun canFullScreen(context: Context): Boolean {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        return android.os.Build.VERSION.SDK_INT < 34 || nm.canUseFullScreenIntent()
-    }
-
-    /** إشعار منبه بملء الشاشة فوق شاشة القفل (بدل فتح Activity من الخلفية) */
-    fun showFullScreen(context: Context, title: String, text: String) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val pi = PendingIntent.getActivity(context, NTF_FAJR_FULLSCREEN,
-            Intent(context, com.oman.prayertimes.ui.AlarmActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val n = NotificationCompat.Builder(context, CH_ALERTS)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setFullScreenIntent(pi, true)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setContentIntent(pi)
-            .build()
-        nm.notify(NTF_FAJR_FULLSCREEN, n)
-    }
-
-    fun cancelFullScreen(context: Context) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.cancel(NTF_FAJR_FULLSCREEN)
+            NotificationManager.IMPORTANCE_LOW).apply {
+            description = "العدّ التنازلي للصلاة القادمة في شريط الإشعارات"
+            setShowBadge(false)
+        })
     }
 
     private fun openAppIntent(context: Context): PendingIntent =
@@ -70,18 +69,40 @@ object NotificationHelper {
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
-    /** إشعار ثابت في الستار: الصلاة القادمة أو العد التنازلي */
-    fun showPersistent(context: Context, text: String) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val n = NotificationCompat.Builder(context, CH_PERSIST)
+    /** «5 دقائق» / «15 دقيقة» … بالصيغة العربية الصحيحة */
+    fun minutesText(n: Int): String = when {
+        n == 1 -> "دقيقة واحدة"
+        n == 2 -> "دقيقتان"
+        n in 3..10 -> "$n دقائق"
+        else -> "$n دقيقة"
+    }
+
+    /** إشعار التنبيه قبل الصلاة (الصوت يأتي من القناة نفسها) */
+    fun showPreAlert(context: Context, prayerName: String, leadMinutes: Int, adhanTime: String) {
+        val n = NotificationCompat.Builder(context, CH_PREALERT)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("مواقيت الصلاة - عُمان")
-            .setContentText(text)
-            .setOngoing(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setColor(BRAND_GREEN)
+            .setContentTitle("اقترب وقت صلاة $prayerName")
+            .setContentText("بقي ${minutesText(leadMinutes)} • الأذان ${PrayerUtils.format12(adhanTime)}")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
             .setContentIntent(openAppIntent(context))
             .build()
-        nm.notify(NTF_PERSIST, n)
+        nm(context).notify(NTF_PREALERT, n)
+    }
+
+    fun showTasbih(context: Context, text: String, index: Int) {
+        val n = NotificationCompat.Builder(context, CH_TASBIH)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(BRAND_GREEN)
+            .setContentTitle("تذكير")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        nm(context).notify(NTF_TASBIH_BASE + index, n)
     }
 
     /** عدّاد تنازلي حيّ في الستار (يعدّ بالثانية بواسطة النظام نفسه) */
@@ -100,9 +121,9 @@ object NotificationHelper {
         rv.setTextViewText(R.id.notif_label, label)
         rv.setChronometer(R.id.notif_chrono, SystemClock.elapsedRealtime() + remaining, format, true)
         rv.setChronometerCountDown(R.id.notif_chrono, true)
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val n = NotificationCompat.Builder(context, CH_PERSIST)
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(BRAND_GREEN)
             .setContentTitle(label)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(rv)
@@ -112,35 +133,6 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(openAppIntent(context))
             .build()
-        nm.notify(NTF_PERSIST, n)
-    }
-
-    fun showEvent(context: Context, channel: String, title: String, text: String, id: Int) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val n = NotificationCompat.Builder(context, channel)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setAutoCancel(true)
-            .setContentIntent(openAppIntent(context))
-            .build()
-        nm.notify(id, n)
-    }
-
-    fun playbackNotification(context: Context, title: String): android.app.Notification {
-        val stopIntent = android.app.PendingIntent.getService(
-            context, 9001,
-            Intent(context, com.oman.prayertimes.services.PlaybackService::class.java)
-                .setAction(com.oman.prayertimes.services.PlaybackService.ACTION_STOP),
-            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        return NotificationCompat.Builder(context, CH_PLAYBACK)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setOngoing(true)
-            .setContentIntent(openAppIntent(context))
-            .addAction(0, "إيقاف", stopIntent)
-            .build()
+        nm(context).notify(NTF_PERSIST, n)
     }
 }
-// END OF FILE

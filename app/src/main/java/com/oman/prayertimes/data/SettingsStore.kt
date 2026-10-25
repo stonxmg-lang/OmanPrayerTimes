@@ -10,19 +10,40 @@ class SettingsStore(context: Context) {
         val DND_DEFAULTS = mapOf(
             "fajr" to 45, "dhuhr" to 35, "asr" to 35, "maghrib" to 25, "isha" to 35
         )
+
+        /** خيارات مدة التنبيه قبل الأذان (دقائق) */
+        val ALERT_LEAD_OPTIONS = listOf(5, 10, 15, 20, 30)
     }
 
     var cityId: Int
         get() = sp.getInt("city_id", Cities.defaultCityId)
         set(v) { sp.edit().putInt("city_id", v).apply() }
 
-    var onboardingDone: Boolean
-        get() = sp.getBoolean("onboarding_done", false)
-        set(v) { sp.edit().putBoolean("onboarding_done", v).apply() }
+    // ── التنبيه قبل الصلاة (إشعار + صوت) ──
 
     var alertsEnabled: Boolean
         get() = sp.getBoolean("alerts_enabled", true)
         set(v) { sp.edit().putBoolean("alerts_enabled", v).apply() }
+
+    /** تفعيل التنبيه لكل صلاة على حدة */
+    fun alertEnabled(key: String): Boolean = sp.getBoolean("alert_on_$key", true)
+    fun setAlertEnabled(key: String, enabled: Boolean) {
+        sp.edit().putBoolean("alert_on_$key", enabled).apply()
+    }
+
+    /** كم دقيقة قبل أذان الفجر */
+    var alertLeadFajr: Int
+        get() = sp.getInt("alert_lead_fajr", 5)
+        set(v) { sp.edit().putInt("alert_lead_fajr", v).apply() }
+
+    /** كم دقيقة قبل أذان باقي الصلوات */
+    var alertLeadOther: Int
+        get() = sp.getInt("alert_lead_other", 10)
+        set(v) { sp.edit().putInt("alert_lead_other", v).apply() }
+
+    fun alertLead(key: String): Int = if (key == "fajr") alertLeadFajr else alertLeadOther
+
+    // ── الصامت أثناء الصلاة ──
 
     var dndEnabled: Boolean
         get() = sp.getBoolean("dnd_enabled", true)
@@ -35,41 +56,7 @@ class SettingsStore(context: Context) {
         get() = sp.getInt("dnd_friday_min", 60)
         set(v) { sp.edit().putInt("dnd_friday_min", v).apply() }
 
-    var fajrAlarmEnabled: Boolean
-        get() = sp.getBoolean("fajr_alarm_enabled", false)
-        set(v) { sp.edit().putBoolean("fajr_alarm_enabled", v).apply() }
-
-    var fajrAlarmMinutes: Int
-        get() = sp.getInt("fajr_alarm_minutes", 30)
-        set(v) { sp.edit().putInt("fajr_alarm_minutes", v).apply() }
-
-    var fajrAlarmSound: String
-        get() = sp.getString("fajr_alarm_sound", "alarm_01") ?: "alarm_01"
-        set(v) { sp.edit().putString("fajr_alarm_sound", v).apply() }
-
-    var fajrAlarmRepeat: Int
-        get() = sp.getInt("fajr_alarm_repeat", 1)
-        set(v) { sp.edit().putInt("fajr_alarm_repeat", v).apply() }
-
-    fun adhanEnabled(key: String): Boolean = sp.getBoolean("adhan_on_$key", true)
-    fun setAdhanEnabled(key: String, enabled: Boolean) {
-        sp.edit().putBoolean("adhan_on_$key", enabled).apply()
-    }
-
-    /** صوت أذان الظهر والعصر والمغرب والعشاء (فارغ = الافتراضي) */
-    var adhanVoice: String
-        get() = sp.getString("adhan_voice", "") ?: ""
-        set(v) { sp.edit().putString("adhan_voice", v).apply() }
-
-    /** صوت أذان الفجر المستقل (فارغ = الافتراضي) */
-    var fajrAdhanVoice: String
-        get() = sp.getString("fajr_adhan_voice", "") ?: ""
-        set(v) { sp.edit().putString("fajr_adhan_voice", v).apply() }
-
-    /** مستوى صوت الأذان والتنبيهات والتسبيحات (0..100) */
-    var adhanVolume: Int
-        get() = sp.getInt("adhan_volume", 100)
-        set(v) { sp.edit().putInt("adhan_volume", v).apply() }
+    // ── التذكير بالذكر ──
 
     var tasbihEnabled: Boolean
         get() = sp.getBoolean("tasbih_enabled", false)
@@ -90,4 +77,3 @@ class SettingsStore(context: Context) {
         sp.edit().putBoolean("tasbih_text_$index", enabled).apply()
     }
 }
-// END OF FILE

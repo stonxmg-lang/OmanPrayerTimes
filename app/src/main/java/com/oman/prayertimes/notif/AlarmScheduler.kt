@@ -5,27 +5,27 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import com.oman.prayertimes.data.PrayerRepository
-import com.oman.prayertimes.data.RawSounds
 import com.oman.prayertimes.data.SettingsStore
 import com.oman.prayertimes.data.TasbihTexts
 import com.oman.prayertimes.model.DayTimes
 import com.oman.prayertimes.receivers.AlarmReceiver
 import com.oman.prayertimes.utils.PrayerUtils
+import com.oman.prayertimes.work.PrayerWorker
 import java.time.DayOfWeek
 import java.time.LocalDate
 
 object AlarmScheduler {
 
     const val RQ_ALERT_BASE      = 100
-    const val RQ_ADHAN_BASE      = 200
     const val RQ_DND_BASE        = 300
     const val RQ_COUNTDOWN       = 400
     const val RQ_TASBIH_BASE     = 500
-    const val RQ_FAJR_ALARM      = 600
     const val RQ_DND_ENTER_BASE  = 700
+    const val RQ_DAY_ROLLOVER    = 800
 
-    const val ALERT_LEAD_FAJR = 5
-    const val ALERT_LEAD_OTHER = 10
+    // رموز طلبات الإصدارات القديمة (الأذان ومنبه الفجر) — نلغيها فقط عند الترقية
+    private const val LEGACY_RQ_ADHAN_BASE = 200
+    private const val LEGACY_RQ_FAJR_ALARM = 600
 
     /**
      * مدة الصامت بعد كل صلاة بالدقائق: من إعدادات المستخدم،
@@ -40,6 +40,17 @@ object AlarmScheduler {
     private fun pending(context: Context, requestCode: Int, intent: Intent): PendingIntent =
         PendingIntent.getBroadcast(context, requestCode, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+
+    private fun intentOf(context: Context, type: String) =
+        Intent(context, AlarmReceiver::class.java).putExtra("type", type)
+
+    /** وقت بالمللي ثانية لدقيقة معيّنة من اليوم (قد تتجاوز 24 ساعة فتنتقل لليوم التالي) */
+    private fun atMinute(date: LocalDate, minuteOfDay: Int): Long {
+        val d = date.plusDays((minuteOfDay / 1440).toLong())
+        val m = minuteOfDay % 1440
+        return PrayerUtils.calendarForToday(
+            String.format(java.util.Locale.US, "%02d:%02d", m / 60, m % 60), d)
+    }
 
     private fun exactAt(context: Context, triggerAt: Long, pi: PendingIntent) {
         if (triggerAt <= System.currentTimeMillis()) return
@@ -56,8 +67,8 @@ object AlarmScheduler {
     }
 
     /**
-     * يجدول كل أحداث اليوم: تنبيهات، أذان، دخول/خروج الصامت (مستقلان عن الأذان)،
-     * عدّ تنازلي، تسبيحات، ومنبه الفجر.
+     * يجدول كل أحداث اليوم: التنبيه قبل الصلاة، دخول/خروج الصامت، العدّ التنازلي،
+     * التذكيرات، ومنبّه منتصف الليل لجدولة اليوم التالي.
      * أي ميزة معطّلة تُلغى منبهاتها صراحة.
      */
     fun scheduleForDay(context: Context, times: DayTimes, date: LocalDate = LocalDate.now()) {
@@ -70,93 +81,42 @@ object AlarmScheduler {
 
         for (i in keys.indices) {
             val key = keys[i]
+            // تنظيف منبهات الأذان/المنبه من الإصدارات السابقة
+            cancel(context, LEGACY_RQ_ADHAN_BASE + i)
             if (key == "sunrise") continue
             val adhan = adhanMin[i]
+            if (adhan < 0) continue
 
-            // ── منبه الفجر ──
-            if (key == "fajr") {
-                if (settings.fajrAlarmEnabled) {
-                    val fajrAlarmMinute = adhan - settings.fajrAlarmMinutes
-                    if (fajrAlarmMinute >= 0) {
-                        val intent = Intent(context, AlarmReceiver::class.java).apply {
-                            putExtra("type", AlarmReceiver.TYPE_FAJR_ALARM)
-                        }
-                        exactAt(context, PrayerUtils.calendarForToday(
-                            String.format(java.util.Locale.US, "%02d:%02d",
-                                fajrAlarmMinute / 60, fajrAlarmMinute % 60), date),
-                            pending(context, RQ_FAJR_ALARM, intent))
-                    } else {
-                        cancel(context, RQ_FAJR_ALARM)
-                    }
-                } else {
-                    cancel(context, RQ_FAJR_ALARM)
+            // ── التنبيه قبل الصلاة: إشعار + صوت ──
+            val lead = settings.alertLead(key)
+            val alertMin = adhan - lead
+            if (settings.alertsEnabled && settings.alertEnabled(key) && alertMin >= 0) {
+                val intent = intentOf(context, AlarmReceiver.TYPE_ALERT).apply {
+                    putExtra("prayerName", DayTimes.NAMES[i])
+                    putExtra("lead", lead)
+                    putExtra("adhanTime", DayTimes.get(times, key))
                 }
-            }
-
-            // ── تنبيه قبل الصلاة ──
-            if (settings.alertsEnabled) {
-                val lead = if (key == "fajr") ALERT_LEAD_FAJR else ALERT_LEAD_OTHER
-                val alertMin = adhan - lead
-                val fajrAlarmMinute = if (key == "fajr" && settings.fajrAlarmEnabled)
-                    adhan - settings.fajrAlarmMinutes else -1
-                val collidesWithAlarm = key == "fajr" && alertMin == fajrAlarmMinute
-                if (alertMin >= 0 && !collidesWithAlarm) {
-                    val intent = Intent(context, AlarmReceiver::class.java).apply {
-                        putExtra("type", AlarmReceiver.TYPE_ALERT)
-                        putExtra("prayerIndex", i)
-                        putExtra("sound", "alert_$key")
-                        putExtra("prayerName", DayTimes.NAMES[i])
-                    }
-                    exactAt(context, PrayerUtils.calendarForToday(
-                        String.format(java.util.Locale.US, "%02d:%02d",
-                            alertMin / 60, alertMin % 60), date),
-                        pending(context, RQ_ALERT_BASE + i, intent))
-                } else {
-                    cancel(context, RQ_ALERT_BASE + i)
-                }
+                exactAt(context, atMinute(date, alertMin), pending(context, RQ_ALERT_BASE + i, intent))
             } else {
                 cancel(context, RQ_ALERT_BASE + i)
             }
 
-            // ── الأذان (يُلغى عند التعطيل أو غياب أي ملف صوت) ──
-            val adhanSound = RawSounds.resolveAdhan(context, key, settings)
-            if (settings.adhanEnabled(key) && adhanSound != null) {
-                val adhanIntent = Intent(context, AlarmReceiver::class.java).apply {
-                    putExtra("type", AlarmReceiver.TYPE_ADHAN)
-                    putExtra("prayerIndex", i)
-                    putExtra("sound", adhanSound)
-                    putExtra("prayerName", DayTimes.NAMES[i])
-                }
-                exactAt(context, PrayerUtils.calendarForToday(DayTimes.get(times, key), date),
-                    pending(context, RQ_ADHAN_BASE + i, adhanIntent))
-            } else {
-                cancel(context, RQ_ADHAN_BASE + i)
-            }
-
             // ── الصامت: منبها دخول وخروج مستقلان لكل صلاة ──
             if (settings.dndEnabled) {
-                val enterIntent = Intent(context, AlarmReceiver::class.java).apply {
-                    putExtra("type", AlarmReceiver.TYPE_DND_ENTER)
-                }
-                exactAt(context, PrayerUtils.calendarForToday(DayTimes.get(times, key), date),
-                    pending(context, RQ_DND_ENTER_BASE + i, enterIntent))
-
-                val exitMin = dndExitMinutes(settings, key, date)
-                val exitAt = adhan + exitMin
-                val exitIntent = Intent(context, AlarmReceiver::class.java).apply {
-                    putExtra("type", AlarmReceiver.TYPE_DND_EXIT)
-                }
-                exactAt(context, PrayerUtils.calendarForToday(
-                    String.format(java.util.Locale.US, "%02d:%02d", exitAt / 60, exitAt % 60), date),
-                    pending(context, RQ_DND_BASE + i, exitIntent))
+                exactAt(context, atMinute(date, adhan),
+                    pending(context, RQ_DND_ENTER_BASE + i, intentOf(context, AlarmReceiver.TYPE_DND_ENTER)))
+                exactAt(context, atMinute(date, adhan + dndExitMinutes(settings, key, date)),
+                    pending(context, RQ_DND_BASE + i, intentOf(context, AlarmReceiver.TYPE_DND_EXIT)))
             } else {
                 cancel(context, RQ_DND_ENTER_BASE + i)
                 cancel(context, RQ_DND_BASE + i)
             }
         }
+        cancel(context, LEGACY_RQ_FAJR_ALARM)
 
         refreshCountdown(context)
-        scheduleTasbih(context, times, adhanMin, date, settings)
+        scheduleTasbih(context, adhanMin, date, settings)
+        scheduleRollover(context, date)
     }
 
     /** يعيد جدولة تنبيهات اليوم الحالي — يُستدعى من كل تعديل إعدادات */
@@ -164,8 +124,19 @@ object AlarmScheduler {
         val repo = PrayerRepository(context)
         val today = LocalDate.now()
         val times = repo.getDay(repo.loadCache(), today.year, today.monthValue, today.dayOfMonth)
-            ?: return
+        if (times == null) {
+            // لا بيانات لليوم (مثلاً أول يناير قبل تحميل السنة الجديدة): حمّلها في الخلفية
+            PrayerWorker.runOnce(context)
+            return
+        }
         scheduleForDay(context, times, today)
+    }
+
+    /** منبه بعد منتصف الليل بنصف دقيقة لجدولة اليوم الجديد (لا ننتظر WorkManager) */
+    private fun scheduleRollover(context: Context, date: LocalDate) {
+        val at = PrayerUtils.calendarForToday("00:00", date.plusDays(1)) + 30_000L
+        exactAt(context, at, pending(context, RQ_DAY_ROLLOVER,
+            intentOf(context, AlarmReceiver.TYPE_DAY_ROLLOVER)))
     }
 
     fun refreshCountdown(context: Context) {
@@ -194,21 +165,23 @@ object AlarmScheduler {
 
         val remaining = target - now
         val nextRefresh = if (remaining > 3_600_000L) target - 3_600_000L else target
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            putExtra("type", AlarmReceiver.TYPE_COUNTDOWN)
-        }
-        exactAt(context, nextRefresh, pending(context, RQ_COUNTDOWN, intent))
+        exactAt(context, nextRefresh,
+            pending(context, RQ_COUNTDOWN, intentOf(context, AlarmReceiver.TYPE_COUNTDOWN)))
     }
 
-    private fun scheduleTasbih(context: Context, times: DayTimes, adhanMin: List<Int>,
+    private fun scheduleTasbih(context: Context, adhanMin: List<Int>,
                                date: LocalDate, settings: SettingsStore) {
         for (i in 0..9) cancel(context, RQ_TASBIH_BASE + i)
         if (!settings.tasbihEnabled) return
 
+        // الصيغ التي اختارها المستخدم فقط (ولو ألغى الكل نستخدم الكل)
+        val texts = TasbihTexts.list.indices.filter { settings.tasbihTextEnabled(it) }
+            .ifEmpty { TasbihTexts.list.indices.toList() }
+
         val n = settings.tasbihCount.coerceIn(2, 10)
         val fajrMin = adhanMin[0]
         val ishaMin = adhanMin[5]
-        if (ishaMin <= fajrMin) return
+        if (fajrMin < 0 || ishaMin <= fajrMin) return
 
         val interval = (ishaMin - fajrMin).toDouble() / (n + 1)
         val windows = DayTimes.KEYS.indices
@@ -219,36 +192,33 @@ object AlarmScheduler {
         for (k in 1..n) {
             val t = (fajrMin + interval * k).toInt()
             if (windows.any { t in it }) continue
-            val idx = scheduled % TasbihTexts.list.size
-            val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra("type", AlarmReceiver.TYPE_TASBIH)
-                putExtra("tasbihIndex", idx)
+            val intent = intentOf(context, AlarmReceiver.TYPE_TASBIH).apply {
+                putExtra("tasbihIndex", texts[scheduled % texts.size])
             }
-            exactAt(context, PrayerUtils.calendarForToday(
-                String.format(java.util.Locale.US, "%02d:%02d", t / 60, t % 60), date),
-                pending(context, RQ_TASBIH_BASE + scheduled, intent))
+            exactAt(context, atMinute(date, t), pending(context, RQ_TASBIH_BASE + scheduled, intent))
             scheduled++
         }
     }
 
     fun cancel(context: Context, requestCode: Int) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, AlarmReceiver::class.java)
-        val pi = PendingIntent.getBroadcast(context, requestCode, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val pi = PendingIntent.getBroadcast(context, requestCode,
+            Intent(context, AlarmReceiver::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE) ?: return
         am.cancel(pi)
+        pi.cancel()
     }
 
     fun cancelAll(context: Context) {
         for (i in 0..5) {
             cancel(context, RQ_ALERT_BASE + i)
-            cancel(context, RQ_ADHAN_BASE + i)
+            cancel(context, LEGACY_RQ_ADHAN_BASE + i)
             cancel(context, RQ_DND_BASE + i)
             cancel(context, RQ_DND_ENTER_BASE + i)
         }
         for (i in 0..9) cancel(context, RQ_TASBIH_BASE + i)
         cancel(context, RQ_COUNTDOWN)
-        cancel(context, RQ_FAJR_ALARM)
+        cancel(context, LEGACY_RQ_FAJR_ALARM)
+        cancel(context, RQ_DAY_ROLLOVER)
     }
 }
-// END OF FILE

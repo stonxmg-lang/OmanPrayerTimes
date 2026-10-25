@@ -1,113 +1,50 @@
 package com.oman.prayertimes.notif
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
-import android.os.SystemClock
-import androidx.core.content.ContextCompat
 
 /**
- * يشغّل ملفات OGG/MP3 من res/raw بالاسم الديناميكي.
- * إذا غاب الملف يستخدم نغمة الإشعار الافتراضية للنظام.
- * أثناء التشغيل: ضغطة زر الباور (إطفاء أو إشعال الشاشة) توقف الصوت.
+ * تشغيل صوت قصير مرة واحدة على مسار الإشعارات (يتبع مستوى صوت الإشعارات
+ * ويحترم الوضع الصامت). يُستخدم لتذكيرات الذكر فقط.
+ * إن لم يوجد الملف في res/raw تُستخدم نغمة الإشعار الافتراضية للنظام.
  */
 object AudioPlayer {
     private var player: MediaPlayer? = null
-    private var remainingLoops = 1
-    private var onDone: (() -> Unit)? = null
 
-    private var screenReceiver: BroadcastReceiver? = null
-    private var registeredOn: Context? = null
-    private var startedAt = 0L
-    // تجاهل أحداث الشاشة في أول ثواني (قد يكون الأذان نفسه هو من أشعل الشاشة)
-    private const val POWER_GRACE_MS = 3000L
-
-    fun play(
-        context: Context,
-        rawName: String,
-        repeatCount: Int = 1,
-        alarmStream: Boolean = true,
-        volume: Float = 1f,
-        onDone: (() -> Unit)? = null
-    ) {
+    fun play(context: Context, rawName: String) {
         stop()
-        this.onDone = onDone
-        remainingLoops = repeatCount.coerceAtLeast(1)
-        val resId = context.resources.getIdentifier(rawName, "raw", context.packageName)
+        val ctx = context.applicationContext
+        val resId = ctx.resources.getIdentifier(rawName, "raw", ctx.packageName)
         val mp = MediaPlayer()
         try {
             if (resId != 0) {
-                val afd = context.resources.openRawResourceFd(resId)
-                mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
+                ctx.resources.openRawResourceFd(resId).use { afd ->
+                    mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                }
             } else {
-                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                mp.setDataSource(context, uri)
+                mp.setDataSource(ctx, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
             }
             mp.setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(if (alarmStream) AudioAttributes.USAGE_ALARM else AudioAttributes.USAGE_NOTIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
             )
-            mp.setVolume(volume.coerceIn(0f, 1f), volume.coerceIn(0f, 1f))
-            mp.setOnCompletionListener {
-                remainingLoops--
-                if (remainingLoops > 0) { it.seekTo(0); it.start() }
-                else finish()
-            }
+            mp.setOnCompletionListener { stop() }
             mp.prepare()
             mp.start()
             player = mp
-            startedAt = SystemClock.elapsedRealtime()
-            registerPowerStop(context.applicationContext)
         } catch (e: Exception) {
             try { mp.release() } catch (_: Exception) {}
-            finish()
+            player = null
         }
-    }
-
-    /** إنهاء التشغيل ثم إبلاغ صاحب الطلب (مثلاً لإيقاف الخدمة) */
-    private fun finish() {
-        val cb = onDone
-        stop()
-        cb?.invoke()
     }
 
     fun stop() {
-        try { player?.stop(); player?.release() } catch (_: Exception) {}
+        try { player?.stop() } catch (_: Exception) {}
+        try { player?.release() } catch (_: Exception) {}
         player = null
-        remainingLoops = 1
-        onDone = null
-        unregisterPowerStop()
-    }
-
-    fun isPlaying(): Boolean = player?.isPlaying == true
-
-    private fun registerPowerStop(ctx: Context) {
-        unregisterPowerStop()
-        val r = object : BroadcastReceiver() {
-            override fun onReceive(c: Context, i: Intent) {
-                if (SystemClock.elapsedRealtime() - startedAt > POWER_GRACE_MS) finish()
-            }
-        }
-        val f = IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(Intent.ACTION_SCREEN_ON)
-        }
-        ContextCompat.registerReceiver(ctx, r, f, ContextCompat.RECEIVER_NOT_EXPORTED)
-        screenReceiver = r
-        registeredOn = ctx
-    }
-
-    private fun unregisterPowerStop() {
-        try { screenReceiver?.let { registeredOn?.unregisterReceiver(it) } } catch (_: Exception) {}
-        screenReceiver = null
-        registeredOn = null
     }
 }
-// END OF FILE
