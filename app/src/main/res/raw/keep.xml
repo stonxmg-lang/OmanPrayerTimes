@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- أصوات التذكير tasbih_01..10 (إن أضيفت) تُستدعى بالاسم، فلا يحذفها ضاغط الموارد -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/prealert,@raw/tasbih_*" />

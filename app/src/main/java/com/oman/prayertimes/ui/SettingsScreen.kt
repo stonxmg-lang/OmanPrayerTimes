@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,45 +31,55 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.DoNotDisturbOn
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -75,30 +87,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.oman.prayertimes.data.Cities
 import com.oman.prayertimes.data.CityCoords
 import com.oman.prayertimes.data.PrayerRepository
-import com.oman.prayertimes.data.RawSounds
 import com.oman.prayertimes.data.SettingsStore
 import com.oman.prayertimes.data.TasbihTexts
 import com.oman.prayertimes.model.DayTimes
 import com.oman.prayertimes.notif.AlarmScheduler
-import com.oman.prayertimes.notif.AudioPlayer
 import com.oman.prayertimes.notif.DndController
 import com.oman.prayertimes.notif.NotificationHelper
+import com.oman.prayertimes.ui.theme.LocalBrand
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.pow
@@ -110,86 +119,166 @@ fun SettingsScreen() {
     Column(
         Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        CityCard()
-        PermissionsCard()
-        AlertsCard()
-        AdhanCard()
-        FajrAlarmCard()
-        DndCard()
-        TasbihCard()
-        Text(
-            "يعمل التطبيق دون الصلاحيات الاختيارية، لكنها تفعّل الميزات كاملة",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(8.dp))
+        SettingsHeader()
+        Column(
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            CitySection()
+            AlertsSection()
+            DndSection()
+            TasbihSection()
+            PermissionsSection()
+            VersionFooter()
+        }
     }
 }
 
 // ── أدوات مشتركة ─────────────────────────────────────────────
 
 @Composable
-private fun SectionCard(
-    icon: ImageVector, title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(38.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(10.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface)
-            }
-            Spacer(Modifier.height(12.dp))
-            content()
-        }
-    }
-}
-
-@Composable
-private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
+private fun SettingsHeader() {
+    val brand = LocalBrand.current
+    Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
-            .padding(vertical = 6.dp),
+            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+            .background(brand.heroBrush)
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 22.dp)
+    ) {
+        Text("الإعدادات", style = MaterialTheme.typography.headlineSmall, color = brand.onHero)
+        Spacer(Modifier.height(2.dp))
+        Text("المدينة والتنبيهات والصامت", style = MaterialTheme.typography.bodyMedium,
+            color = brand.onHeroMuted)
+        Spacer(Modifier.height(10.dp))
+        // لمسة حمراء صغيرة تحت العنوان
+        Box(Modifier.width(36.dp).height(4.dp).clip(RoundedCornerShape(50)).background(brand.accent))
+    }
+}
+
+/** عنوان القسم (رمادي خارج البطاقة) ثم بطاقة بيضاء بداخلها الصفوف */
+@Composable
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Spacer(Modifier.height(12.dp))
+    Text(title, Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    AppCard(content = content)
+}
+
+@Composable
+private fun RowIcon(icon: ImageVector, tint: Color = MaterialTheme.colorScheme.primary,
+                    container: Color = MaterialTheme.colorScheme.primaryContainer) {
+    Box(
+        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(container),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(19.dp))
+    }
+}
+
+/** صف إعداد موحّد: أيقونة + عنوان + وصف اختياري + عنصر جانبي */
+@Composable
+private fun SettingRow(
+    icon: ImageVector?,
+    title: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 60.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = null)
+        if (icon != null) {
+            RowIcon(icon)
+            Spacer(Modifier.width(14.dp))
+        } else {
+            Spacer(Modifier.width(50.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            trailing()
+        }
     }
 }
 
 @Composable
-private fun OnResumeEffect(onResume: () -> Unit) {
-    val owner = LocalLifecycleOwner.current
-    DisposableEffect(owner) {
-        val obs = LifecycleEventObserver { _, e ->
-            if (e == Lifecycle.Event.ON_RESUME) onResume()
+private fun appSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = Color.White,
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+    uncheckedBorderColor = MaterialTheme.colorScheme.outline
+)
+
+@Composable
+private fun SwitchRow(
+    icon: ImageVector?, title: String, subtitle: String? = null,
+    checked: Boolean, onChange: (Boolean) -> Unit
+) {
+    SettingRow(
+        icon, title, subtitle,
+        Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+    ) {
+        Switch(checked = checked, onCheckedChange = null, colors = appSwitchColors())
+    }
+}
+
+@Composable
+private fun ChevronValue(value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(value, style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary)
+        Icon(Icons.Default.ChevronLeft, contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun MinutesDropdown(value: Int, options: List<Int>, onSelect: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { expanded = true }
+                .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(NotificationHelper.minutesText(value), style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.ExpandMore, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
-        owner.lifecycle.addObserver(obs)
-        onDispose { owner.lifecycle.removeObserver(obs) }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { o ->
+                DropdownMenuItem(
+                    text = {
+                        Text(NotificationHelper.minutesText(o),
+                            fontWeight = if (o == value) FontWeight.Bold else FontWeight.Normal,
+                            color = if (o == value) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface)
+                    },
+                    onClick = { onSelect(o); expanded = false })
+            }
+        }
     }
 }
 
@@ -197,76 +286,60 @@ private fun reschedule(context: Context, scope: CoroutineScope) {
     scope.launch(Dispatchers.IO) { AlarmScheduler.rescheduleToday(context) }
 }
 
-@Composable
-private fun DropdownSelector(value: Int, options: List<Int>, onSelect: (Int) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        TextButton(onClick = { expanded = true }) {
-            Text("$value دقيقة", color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { o ->
-                DropdownMenuItem(
-                    text = { Text("$o دقيقة") },
-                    onClick = { onSelect(o); expanded = false })
-            }
-        }
-    }
-}
-
 // ── المدينة ──────────────────────────────────────────────────
 
 @Composable
-private fun CityCard() {
+private fun CitySection() {
     val context = LocalContext.current
     val settings = remember { SettingsStore(context) }
     val scope = rememberCoroutineScope()
     var cityName by remember { mutableStateOf(Cities.nameOf(settings.cityId)) }
     var syncMsg by remember { mutableStateOf("") }
+    var syncOk by remember { mutableStateOf(true) }
     var showPicker by remember { mutableStateOf(false) }
 
     OnResumeEffect { cityName = Cities.nameOf(settings.cityId) }
 
     fun applyCity(name: String) {
+        syncOk = true
         syncMsg = "جاري تحديث مواقيت $name…"
-        scope.launch(Dispatchers.IO) {
-            val ok = try { PrayerRepository(context).applyCityChange() } catch (e: Exception) { false }
-            syncMsg = if (ok) "تم تحديث المواقيت والتنبيهات لمدينة $name ✅"
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                try { PrayerRepository(context).applyCityChange() } catch (e: Exception) { false }
+            }
+            syncOk = ok
+            syncMsg = if (ok) "تم تحديث المواقيت والتنبيهات لمدينة $name"
             else "تعذّر تحميل مواقيت $name - تحقق من الإنترنت"
         }
     }
 
-    SectionCard(Icons.Default.LocationOn, "المدينة") {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable { showPicker = true }
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("المدينة الحالية", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(cityName, style = MaterialTheme.typography.titleMedium)
-            }
-            Text("تغيير", color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+    Section("الموقع") {
+        SettingRow(Icons.Default.LocationOn, "المدينة", cityName,
+            Modifier.clickable { showPicker = true }) {
+            ChevronValue("تغيير")
         }
-        Spacer(Modifier.height(8.dp))
-        AutoLocateRow(onLocated = { id, name ->
-            settings.cityId = id
-            cityName = name
-            applyCity(name)
-        })
+        // التحديد التلقائي يظهر فقط بعد إضافة جدول إحداثيات موثوق في CityCoords
+        if (CityCoords.map.isNotEmpty()) {
+            RowDivider()
+            AutoLocateRow(onLocated = { id, name ->
+                settings.cityId = id
+                cityName = name
+                applyCity(name)
+            })
+        }
         if (syncMsg.isNotEmpty()) {
-            Text(syncMsg, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp))
+            RowDivider()
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(Modifier.width(50.dp))
+                Box(Modifier.size(6.dp).clip(CircleShape).background(
+                    if (syncOk) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary))
+                Spacer(Modifier.width(8.dp))
+                Text(syncMsg, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 
@@ -289,28 +362,40 @@ private fun CityPickerDialog(currentId: Int, onDismiss: () -> Unit,
     var query by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("اختر المدينة") },
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text("اختر المدينة", style = MaterialTheme.typography.titleLarge) },
         text = {
             Column {
                 OutlinedTextField(
                     value = query, onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("بحث…") },
+                    placeholder = { Text("ابحث عن مدينة…") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp)
                 )
                 Spacer(Modifier.height(8.dp))
                 val q = query.trim()
                 val filtered = Cities.list.filter { q.isEmpty() || it.first.contains(q) }
                 LazyColumn(Modifier.fillMaxWidth().height(340.dp)) {
                     items(filtered) { (name, id) ->
+                        val selected = id == currentId
                         Row(
-                            Modifier.fillMaxWidth().clickable { onSelect(id, name) }.padding(12.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (selected) MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent)
+                                .clickable { onSelect(id, name) }
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            RadioButton(selected = id == currentId, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(name, style = MaterialTheme.typography.bodyLarge)
+                            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+                            if (selected) Icon(Icons.Default.Check, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -337,8 +422,7 @@ private fun nearestKnownCity(lat: Double, lon: Double): Pair<String, Int>? {
 private fun locateNearestCity(context: Context,
                               onFound: (Int, String) -> Unit,
                               onFail: (String) -> Unit) {
-    val known = nearestKnownCity(0.0, 0.0)
-    if (known == null) {
+    if (CityCoords.map.isEmpty()) {
         onFail("التحديد التلقائي بانتظار جدول الإحداثيات الموثوق - اختر المدينة يدويًا")
         return
     }
@@ -358,6 +442,7 @@ private fun locateNearestCity(context: Context,
         }
     }
 
+    @Suppress("DEPRECATION", "MissingPermission")
     fun request(provider: String): Boolean = try {
         lm.requestSingleUpdate(provider, listener, Looper.getMainLooper()); true
     } catch (e: Exception) { false }
@@ -393,354 +478,146 @@ private fun locateNearestCity(context: Context,
 private fun AutoLocateRow(onLocated: (Int, String) -> Unit) {
     val context = LocalContext.current
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf<String?>(null) }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             busy = true
             status = "جاري تحديد موقعك…"
             locateNearestCity(context,
-                onFound = { id, name -> busy = false; status = ""; onLocated(id, name) },
+                onFound = { id, name -> busy = false; status = null; onLocated(id, name) },
                 onFail = { busy = false; status = it })
         } else status = "تم رفض إذن الموقع - الاختيار اليدوي متاح"
     }
-    OutlinedButton(
-        onClick = { if (!busy) launcher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !busy
-    ) {
-        if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-        else Icon(Icons.Default.LocationOn, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(if (busy) "جاري التحديد…" else "تحديد تلقائي لأقرب مدينة")
-    }
-    if (status.isNotEmpty()) {
-        Text(status, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp))
+    SettingRow(Icons.Default.MyLocation, "تحديد تلقائي لأقرب مدينة", status,
+        Modifier.clickable(enabled = !busy) {
+            launcher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }) {
+        if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        else Icon(Icons.Default.ChevronLeft, contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-// ── الصلاحيات ────────────────────────────────────────────────
+// ── التنبيه قبل الصلاة ───────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun PermissionsCard() {
-    val context = LocalContext.current
-    var tick by remember { mutableStateOf(0) }
-    OnResumeEffect { tick++ }
-    val refresh = tick
-
-    SectionCard(Icons.Default.Notifications, "الصلاحيات") {
-        if (refresh >= 0) {
-            val notifGranted = Build.VERSION.SDK_INT < 33 ||
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-                    PackageManager.PERMISSION_GRANTED
-            PermissionRow("الإشعارات", notifGranted) {
-                context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                })
-            }
-            val exactGranted = Build.VERSION.SDK_INT < 31 ||
-                    (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager)
-                        .canScheduleExactAlarms()
-            PermissionRow("المنبه الدقيق (تنبيهات في وقتها)", exactGranted) {
-                if (Build.VERSION.SDK_INT >= 31)
-                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-            }
-            if (Build.VERSION.SDK_INT >= 34) {
-                PermissionRow("إشعارات ملء الشاشة (منبه الفجر)",
-                    NotificationHelper.canFullScreen(context)) {
-                    context.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT))
-                }
-            }
-            val dndGranted = (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .isNotificationPolicyAccessGranted
-            PermissionRow("عدم الإزعاج (الصامت أثناء الصلاة)", dndGranted) {
-                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
-            }
-            val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
-            PermissionRow("البطارية: إيقاف التحسين التلقائي (مهم لأجهزة OPPO وسامسونغ)",
-                pm.isIgnoringBatteryOptimizations(context.packageName)) {
-                // بدون صلاحية خاصة (متوافق مع Play): نفتح صفحة إعدادات النظام
-                context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-            }
-        }
-    }
-}
-
-@Composable
-private fun PermissionRow(name: String, granted: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier.size(8.dp).background(
-                if (granted) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.tertiary, RoundedCornerShape(4.dp))
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Text(if (granted) "مفعّل" else "تفعيل",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (granted) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.tertiary,
-            fontWeight = FontWeight.SemiBold)
-    }
-}
-
-// ── تنبيهات الصلاة ───────────────────────────────────────────
-
-@Composable
-private fun AlertsCard() {
+private fun AlertsSection() {
     val context = LocalContext.current
     val settings = remember { SettingsStore(context) }
     val scope = rememberCoroutineScope()
-    var alerts by remember { mutableStateOf(settings.alertsEnabled) }
-    SectionCard(Icons.Default.NotificationsActive, "تنبيهات الصلاة") {
-        SwitchRow("تنبيه قبل الصلاة (الفجر قبل 5 دقائق، وباقي الصلوات قبل 10)", alerts) {
-            alerts = it; settings.alertsEnabled = it; reschedule(context, scope)
-        }
-    }
-}
+    var enabled by remember { mutableStateOf(settings.alertsEnabled) }
+    var leadFajr by remember { mutableIntStateOf(settings.alertLeadFajr) }
+    var leadOther by remember { mutableIntStateOf(settings.alertLeadOther) }
 
-// ── الأذان ───────────────────────────────────────────────────
-
-@Composable
-private fun AdhanCard() {
-    val context = LocalContext.current
-    val settings = remember { SettingsStore(context) }
-    val scope = rememberCoroutineScope()
-    var voice by remember { mutableStateOf(settings.adhanVoice) }
-    var fajrVoice by remember { mutableStateOf(settings.fajrAdhanVoice) }
-    var vol by remember { mutableStateOf(settings.adhanVolume) }
-    var showVoices by remember { mutableStateOf(false) }
-    var showFajrVoices by remember { mutableStateOf(false) }
-    val voices = remember { RawSounds.regularVoices(context) }
-    val fajrVoices = remember { RawSounds.fajrVoices(context) }
-
-    SectionCard(Icons.Default.WbSunny, "الأذان") {
-        DayTimes.PRAYER_KEYS.forEachIndexed { i, key ->
-            var on by remember { mutableStateOf(settings.adhanEnabled(key)) }
-            SwitchRow("أذان ${DayTimes.PRAYER_NAMES[i]}", on) { v ->
-                on = v; settings.setAdhanEnabled(key, v); reschedule(context, scope)
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        PickerRow("صوت أذان الفجر",
-            fajrVoices.firstOrNull { it.id == fajrVoice }?.display ?: "الافتراضي") {
-            showFajrVoices = true
-        }
-        PickerRow("صوت باقي الصلوات",
-            voices.firstOrNull { it.id == voice }?.display ?: "الافتراضي") {
-            showVoices = true
-        }
-        Spacer(Modifier.height(8.dp))
-        Text("مستوى الصوت: $vol%",
-            style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-        Slider(
-            value = vol / 100f,
-            onValueChange = { vol = (it * 100).toInt(); settings.adhanVolume = vol },
-            valueRange = 0f..1f
-        )
-    }
-
-    if (showVoices) {
-        VoiceDialog(title = "صوت أذان الظهر والعصر والمغرب والعشاء",
-            voices = voices, current = voice,
-            onDismiss = { showVoices = false }) { v ->
-            voice = v; settings.adhanVoice = v
-            showVoices = false; reschedule(context, scope)
-        }
-    }
-    if (showFajrVoices) {
-        VoiceDialog(title = "صوت أذان الفجر",
-            voices = fajrVoices, current = fajrVoice,
-            onDismiss = { showFajrVoices = false }) { v ->
-            fajrVoice = v; settings.fajrAdhanVoice = v
-            showFajrVoices = false; reschedule(context, scope)
-        }
-    }
-}
-
-@Composable
-private fun PickerRow(label: String, value: String, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Text(value, color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall)
-    }
-    Spacer(Modifier.height(6.dp))
-}
-
-@Composable
-private fun VoiceDialog(title: String, voices: List<RawSounds.Voice>, current: String,
-                        onDismiss: () -> Unit, onSelect: (String) -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                items(voices) { v ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onSelect(v.id) }.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = v.id == current, onClick = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(v.display, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
-    )
-}
-
-// ── منبه الفجر ───────────────────────────────────────────────
-
-@Composable
-private fun FajrAlarmCard() {
-    val context = LocalContext.current
-    val settings = remember { SettingsStore(context) }
-    val scope = rememberCoroutineScope()
-    var enabled by remember { mutableStateOf(settings.fajrAlarmEnabled) }
-    var minutes by remember { mutableStateOf(settings.fajrAlarmMinutes) }
-    var sound by remember { mutableStateOf(settings.fajrAlarmSound) }
-    var repeat by remember { mutableStateOf(settings.fajrAlarmRepeat) }
-    var showSounds by remember { mutableStateOf(false) }
-
-    SectionCard(Icons.Default.Alarm, "منبه الفجر") {
-        SwitchRow("تفعيل منبه الفجر", enabled) {
-            enabled = it; settings.fajrAlarmEnabled = it; reschedule(context, scope)
+    Section("التنبيه قبل الصلاة") {
+        SwitchRow(Icons.Default.NotificationsActive, "تنبيه قبل الأذان",
+            "إشعار مع صوت تنبيه قصير", enabled) {
+            enabled = it; settings.alertsEnabled = it; reschedule(context, scope)
         }
         if (enabled) {
-            Text("قبل الأذان بـ $minutes دقيقة", modifier = Modifier.padding(top = 4.dp))
-            Slider(
-                value = minutes.toFloat(),
-                onValueChange = { minutes = it.toInt(); settings.fajrAlarmMinutes = minutes },
-                valueRange = 5f..60f, steps = 10,
-                onValueChangeFinished = { reschedule(context, scope) }
-            )
-            Text("عدد التكرار: $repeat")
-            Slider(
-                value = repeat.toFloat(),
-                onValueChange = { repeat = it.toInt(); settings.fajrAlarmRepeat = repeat },
-                valueRange = 1f..5f, steps = 3,
-                onValueChangeFinished = { reschedule(context, scope) }
-            )
-            val display = if (RawSounds.exists(context, sound)) RawSounds.alarmDisplay(sound)
-            else "نغمة النظام"
-            PickerRow("نغمة المنبه", display) { showSounds = true }
-            Text("بدون غفوة - مدة الرنين = مدة الملف × عدد التكرار",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-
-    if (showSounds) {
-        AlarmSoundDialog(
-            current = sound,
-            onDismiss = { showSounds = false },
-            onSelect = { name ->
-                sound = name; settings.fajrAlarmSound = name
-                showSounds = false; reschedule(context, scope)
-            })
-    }
-}
-
-@Composable
-private fun AlarmSoundDialog(current: String, onDismiss: () -> Unit,
-                             onSelect: (String) -> Unit) {
-    val context = LocalContext.current
-    val alarms = remember { RawSounds.alarmNames(context) }
-    var playing by remember { mutableStateOf("") }
-    DisposableEffect(Unit) { onDispose { AudioPlayer.stop() } }
-
-    AlertDialog(
-        onDismissRequest = { AudioPlayer.stop(); onDismiss() },
-        title = { Text("نغمة المنبه - ▶ للمعاينة") },
-        text = {
-            if (alarms.isEmpty()) {
-                Text("لم تُضف ملفات منبهات بعد - ضع alarm_01.ogg … في app/src/main/res/raw",
-                    style = MaterialTheme.typography.bodyMedium)
-            } else {
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                    items(alarms) { name ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { AudioPlayer.stop(); playing = ""; onSelect(name) }
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = name == current, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(RawSounds.alarmDisplay(name), Modifier.weight(1f))
-                            IconButton(onClick = {
-                                if (playing == name) { AudioPlayer.stop(); playing = "" }
-                                else { AudioPlayer.play(context, name, alarmStream = false); playing = name }
-                            }) {
-                                Icon(
-                                    if (playing == name) Icons.Default.Close else Icons.Default.PlayArrow,
-                                    contentDescription = "معاينة")
-                            }
-                        }
+            RowDivider()
+            SettingRow(Icons.Default.Timer, "قبل أذان الفجر بـ") {
+                MinutesDropdown(leadFajr, SettingsStore.ALERT_LEAD_OPTIONS) {
+                    leadFajr = it; settings.alertLeadFajr = it; reschedule(context, scope)
+                }
+            }
+            RowDivider()
+            SettingRow(Icons.Default.Schedule, "قبل باقي الصلوات بـ") {
+                MinutesDropdown(leadOther, SettingsStore.ALERT_LEAD_OPTIONS) {
+                    leadOther = it; settings.alertLeadOther = it; reschedule(context, scope)
+                }
+            }
+            RowDivider()
+            // اختيار الصلوات التي يصلها تنبيه
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Text("الصلوات المُنبَّه لها", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    DayTimes.PRAYER_KEYS.forEachIndexed { i, key ->
+                        var on by remember { mutableStateOf(settings.alertEnabled(key)) }
+                        FilterChip(
+                            selected = on,
+                            onClick = {
+                                on = !on; settings.setAlertEnabled(key, on); reschedule(context, scope)
+                            },
+                            label = { Text(DayTimes.PRAYER_NAMES[i]) },
+                            leadingIcon = if (on) {
+                                { Icon(Icons.Default.Check, contentDescription = null,
+                                    modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            shape = RoundedCornerShape(50),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = { AudioPlayer.stop(); onDismiss() }) { Text("إغلاق") } }
-    )
+            RowDivider()
+            SettingRow(Icons.Default.MusicNote, "صوت التنبيه", "تغيير النغمة أو مستواها من إعدادات النظام",
+                Modifier.clickable {
+                    context.startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        putExtra(Settings.EXTRA_CHANNEL_ID, NotificationHelper.CH_PREALERT)
+                    })
+                }) {
+                Icon(Icons.Default.ChevronLeft, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            RowDivider()
+            Box(Modifier.fillMaxWidth().padding(14.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        NotificationHelper.showPreAlert(context, "الظهر", leadOther, "12:00")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("تجربة التنبيه الآن")
+                }
+            }
+        }
+    }
 }
 
 // ── الصامت أثناء الصلاة ──────────────────────────────────────
 
 @Composable
-private fun DndCard() {
+private fun DndSection() {
     val context = LocalContext.current
     val settings = remember { SettingsStore(context) }
     val scope = rememberCoroutineScope()
     var dnd by remember { mutableStateOf(settings.dndEnabled) }
 
-    SectionCard(Icons.Default.VolumeOff, "الصامت تلقائيًا أثناء الصلاة") {
-        SwitchRow("تفعيل الصامت أثناء الصلاة (وضع \"المنبهات فقط\")", dnd) { v ->
+    Section("الصامت أثناء الصلاة") {
+        SwitchRow(Icons.Default.DoNotDisturbOn, "صامت تلقائي عند الأذان",
+            "يتحول الجهاز لوضع «المنبهات فقط» ثم يعود", dnd) { v ->
             dnd = v; settings.dndEnabled = v
             if (!v) DndController.onSettingDisabled(context)
             reschedule(context, scope)
         }
         if (dnd) {
-            Spacer(Modifier.height(4.dp))
-            Text("مدة بقاء الجهاز صامتًا بعد كل صلاة:",
-                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             DayTimes.PRAYER_KEYS.forEachIndexed { i, key ->
-                var v by remember { mutableStateOf(settings.dndMinutes(key)) }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("بعد ${DayTimes.PRAYER_NAMES[i]}", Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge)
-                    DropdownSelector(value = v, options = (15..60 step 5).toList()) { nv ->
+                var v by remember { mutableIntStateOf(settings.dndMinutes(key)) }
+                RowDivider()
+                SettingRow(null, "بعد ${DayTimes.PRAYER_NAMES[i]}") {
+                    MinutesDropdown(v, (15..60 step 5).toList()) { nv ->
                         v = nv; settings.setDndMinutes(key, nv); reschedule(context, scope)
                     }
                 }
             }
-            var friday by remember { mutableStateOf(settings.dndFridayMinutes) }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("صلاة الجمعة (الظهر)", Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge)
-                DropdownSelector(value = friday,
-                    options = listOf(30, 40, 50, 60, 90, 120)) { nv ->
+            var friday by remember { mutableIntStateOf(settings.dndFridayMinutes) }
+            RowDivider()
+            SettingRow(null, "صلاة الجمعة") {
+                MinutesDropdown(friday, listOf(30, 40, 50, 60, 90, 120)) { nv ->
                     friday = nv; settings.dndFridayMinutes = nv; reschedule(context, scope)
                 }
             }
@@ -751,46 +628,146 @@ private fun DndCard() {
 // ── التذكير بالصلاة على النبي ﷺ ──────────────────────────────
 
 @Composable
-private fun TasbihCard() {
+private fun TasbihSection() {
     val context = LocalContext.current
     val settings = remember { SettingsStore(context) }
+    val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(settings.tasbihEnabled) }
-    var count by remember { mutableStateOf(settings.tasbihCount) }
+    var count by remember { mutableIntStateOf(settings.tasbihCount) }
     var sound by remember { mutableStateOf(settings.tasbihSound) }
     var showTexts by remember { mutableStateOf(false) }
 
-    SectionCard(Icons.Default.Star, "التذكير بالصلاة على النبي ﷺ") {
-        SwitchRow("تفعيل التذكيرات (موزعة بين الفجر والعشاء)", enabled) {
-            enabled = it; settings.tasbihEnabled = it
+    Section("التذكير بالذكر") {
+        SwitchRow(Icons.Default.Favorite, "التذكير بالصلاة على النبي ﷺ",
+            "موزعة بين الفجر والعشاء", enabled) {
+            enabled = it; settings.tasbihEnabled = it; reschedule(context, scope)
         }
         if (enabled) {
-            Text("عدد التذكيرات اليومية: $count (بحد أقصى 10)",
-                modifier = Modifier.padding(vertical = 4.dp))
-            Slider(
-                value = count.toFloat(),
-                onValueChange = { count = it.toInt(); settings.tasbihCount = count },
-                valueRange = 2f..10f, steps = 7
-            )
-            SwitchRow("تشغيل صوت مع التذكير", sound) { sound = it; settings.tasbihSound = it }
-            Spacer(Modifier.height(6.dp))
-            TextButton(onClick = { showTexts = !showTexts }) {
-                Text(if (showTexts) "إخفاء الصيغ ▲" else "الصيغ المتاحة ▼")
+            RowDivider()
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("عدد التذكيرات يوميًا", Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge)
+                    Text("$count", style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary)
+                }
+                Slider(
+                    value = count.toFloat(),
+                    onValueChange = { count = it.toInt(); settings.tasbihCount = count },
+                    onValueChangeFinished = { reschedule(context, scope) },
+                    valueRange = 2f..10f, steps = 7,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
+            }
+            RowDivider()
+            SwitchRow(null, "تشغيل صوت مع التذكير", checked = sound) {
+                sound = it; settings.tasbihSound = it
+            }
+            RowDivider()
+            SettingRow(null, "الصيغ المستخدمة", modifier = Modifier.clickable { showTexts = !showTexts }) {
+                Icon(if (showTexts) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (showTexts) {
                 TasbihTexts.list.forEachIndexed { i, text ->
                     var itemEnabled by remember { mutableStateOf(settings.tasbihTextEnabled(i)) }
                     Row(
-                        Modifier.fillMaxWidth(),
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(itemEnabled, role = Role.Checkbox) {
+                                itemEnabled = it; settings.setTasbihTextEnabled(i, it)
+                                reschedule(context, scope)
+                            }
+                            .padding(start = 50.dp, end = 14.dp, top = 2.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(checked = itemEnabled, onCheckedChange = {
-                            itemEnabled = it; settings.setTasbihTextEnabled(i, it)
-                        })
-                        Text(text, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        Checkbox(checked = itemEnabled, onCheckedChange = null,
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary,
+                                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant))
+                        Spacer(Modifier.width(8.dp))
+                        Text(text, Modifier.weight(1f).padding(vertical = 8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
+                Spacer(Modifier.height(6.dp))
             }
         }
     }
 }
-// END OF FILE
+
+// ── الصلاحيات ────────────────────────────────────────────────
+
+@Composable
+private fun PermissionsSection() {
+    val context = LocalContext.current
+    var tick by remember { mutableIntStateOf(0) }
+    OnResumeEffect { tick++ }
+
+    // قراءة tick تعيد رسم القسم عند العودة من إعدادات النظام فتتحدث الحالات
+    if (tick < 0) return
+    val notifGranted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    val exactGranted = Build.VERSION.SDK_INT < 31 ||
+            (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
+    val dndGranted = (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+        .isNotificationPolicyAccessGranted
+    val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+    val batteryOk = pm.isIgnoringBatteryOptimizations(context.packageName)
+
+    Section("الصلاحيات") {
+        PermissionRow(Icons.Default.Notifications, "الإشعارات", "ضرورية لوصول التنبيه",
+            notifGranted) {
+            context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            })
+        }
+        RowDivider()
+        PermissionRow(Icons.Default.Schedule, "المنبه الدقيق", "لوصول التنبيه في دقيقته", exactGranted) {
+            if (Build.VERSION.SDK_INT >= 31)
+                context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+        }
+        RowDivider()
+        PermissionRow(Icons.Default.DoNotDisturbOn, "عدم الإزعاج", "للصامت التلقائي أثناء الصلاة",
+            dndGranted) {
+            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+        }
+        RowDivider()
+        PermissionRow(Icons.Default.BatteryAlert, "تحسين البطارية",
+            "أوقفه للتطبيق (مهم لأجهزة OPPO وسامسونج)", batteryOk) {
+            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+    }
+}
+
+@Composable
+private fun PermissionRow(icon: ImageVector, name: String, hint: String,
+                          granted: Boolean, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    SettingRow(icon, name, hint, Modifier.clickable(onClick = onClick)) {
+        if (granted) AppBadge("مفعّل", cs.primaryContainer, cs.primary)
+        else AppBadge("تفعيل", cs.tertiary, cs.onTertiary)
+    }
+}
+
+@Composable
+private fun VersionFooter() {
+    val context = LocalContext.current
+    val version = remember {
+        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" }
+        catch (e: Exception) { "" }
+    }
+    Text(
+        "مواقيت الصلاة - عُمان  •  الإصدار $version",
+        Modifier.fillMaxWidth().padding(vertical = 20.dp),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+}
