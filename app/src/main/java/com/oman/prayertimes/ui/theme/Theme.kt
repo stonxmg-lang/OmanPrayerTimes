@@ -1,11 +1,9 @@
 package com.oman.prayertimes.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,111 +13,84 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /*
- * الهوية اللونية: أخضر (أساسي) + أحمر (لمسات وتمييز) + أبيض (أسطح) + رمادي (نصوص ثانوية وفواصل).
+ * الهوية اللونية: ورق كريمي دافئ (أسطح) + بنّي غامق (نصوص) + تركوازي هادئ (لمسة أساسية)
+ * + ذهبي خفيف (لمسة ثانوية). ألوان العلامة (أحمر للمراجعة، أخضر للحفظ) ثابتة لأنها دلالية.
  */
 
-// ── الألوان الأساسية ──
-val OmanGreen = Color(0xFF0B6E4F)
-val OmanGreenDeep = Color(0xFF064A35)
-val OmanRed = Color(0xFFC8102E)
-val White = Color(0xFFFFFFFF)
+// ── أسطح ونصوص ──
+private val Cream = Color(0xFFF4ECDC)        // الخلفية العامة (ورقي دافئ)
+private val CreamSurface = Color(0xFFFBF6EC) // البطاقات والأسطح
+private val CreamHigh = Color(0xFFF1E7D3)    // أسطح أعلى قليلًا
+private val InkBrown = Color(0xFF362F24)     // النص الأساسي (بنّي غامق)
+private val InkMuted = Color(0xFF857A64)     // النص الثانوي
+private val LineWarm = Color(0xFFE2D6BE)     // الفواصل والحدود
 
-// ── الرمادي ──
-private val Gray50 = Color(0xFFF4F5F4)
-private val Gray100 = Color(0xFFEDEFEE)
-private val Gray200 = Color(0xFFE2E5E3)
-private val Gray500 = Color(0xFF6B716E)
-private val Gray900 = Color(0xFF1B1F1D)
+// ── لمسات ──
+private val Teal = Color(0xFF0F766E)         // اللمسة الأساسية (تركوازي)
+private val TealDeep = Color(0xFF0B5A54)
+private val TealSoft = Color(0xFFCFE6E2)     // خلفية فاتحة للّمسة
+private val Gold = Color(0xFF9A7B3F)         // لمسة ثانوية ذهبية
+private val GoldSoft = Color(0xFFEFE3C8)
+private val Crimson = Color(0xFFB23A2E)      // الأحمر (مراجعة/أخطاء)
+private val CrimsonSoft = Color(0xFFF3DDD8)
 
-private val LightColors = lightColorScheme(
-    primary = OmanGreen,
-    onPrimary = White,
-    primaryContainer = Color(0xFFE3F1EA),
-    onPrimaryContainer = OmanGreenDeep,
-    secondary = Gray500,
-    onSecondary = White,
-    secondaryContainer = Gray100,
-    onSecondaryContainer = Gray900,
-    tertiary = OmanRed,
-    onTertiary = White,
-    tertiaryContainer = Color(0xFFFBE7EA),
-    onTertiaryContainer = Color(0xFF8A0B20),
-    error = OmanRed,
-    onError = White,
-    background = Gray50,
-    onBackground = Gray900,
-    surface = White,
-    onSurface = Gray900,
-    surfaceVariant = Gray100,
-    onSurfaceVariant = Gray500,
-    surfaceContainer = White,
-    surfaceContainerHigh = White,
-    surfaceContainerHighest = Gray100,
-    outline = Gray200,
-    outlineVariant = Gray200
+private val CreamColors = lightColorScheme(
+    primary = Teal,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = TealSoft,
+    onPrimaryContainer = TealDeep,
+    secondary = Gold,
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = GoldSoft,
+    onSecondaryContainer = Color(0xFF5A4518),
+    tertiary = Crimson,
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = CrimsonSoft,
+    onTertiaryContainer = Color(0xFF7A231A),
+    error = Crimson,
+    onError = Color(0xFFFFFFFF),
+    background = Cream,
+    onBackground = InkBrown,
+    surface = CreamSurface,
+    onSurface = InkBrown,
+    surfaceVariant = CreamHigh,
+    onSurfaceVariant = InkMuted,
+    surfaceContainer = CreamSurface,
+    surfaceContainerHigh = CreamHigh,
+    surfaceContainerHighest = CreamHigh,
+    outline = LineWarm,
+    outlineVariant = LineWarm
 )
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFF4FBF94),
-    onPrimary = Color(0xFF00382A),
-    primaryContainer = Color(0xFF123D2F),
-    onPrimaryContainer = Color(0xFFBFE8D6),
-    secondary = Color(0xFF9AA19E),
-    onSecondary = Color(0xFF1B1F1D),
-    secondaryContainer = Color(0xFF262B29),
-    onSecondaryContainer = Color(0xFFE3E6E4),
-    tertiary = Color(0xFFF0646C),
-    onTertiary = Color(0xFF3B0009),
-    tertiaryContainer = Color(0xFF4A1219),
-    onTertiaryContainer = Color(0xFFFFD9DC),
-    error = Color(0xFFF0646C),
-    background = Color(0xFF0F1211),
-    onBackground = Color(0xFFE3E6E4),
-    surface = Color(0xFF181C1A),
-    onSurface = Color(0xFFE3E6E4),
-    surfaceVariant = Color(0xFF222725),
-    onSurfaceVariant = Color(0xFF9AA19E),
-    surfaceContainer = Color(0xFF181C1A),
-    surfaceContainerHigh = Color(0xFF1E2220),
-    surfaceContainerHighest = Color(0xFF262B29),
-    outline = Color(0xFF2C3230),
-    outlineVariant = Color(0xFF2C3230)
-)
-
-/** ألوان خاصة بالتطبيق خارج نظام Material (الرأس الأخضر ولمسته الحمراء) */
+/** ألوان خاصة بالتطبيق خارج نظام Material. */
 @Immutable
 data class BrandColors(
     val heroBrush: Brush,
     val onHero: Color,
     val onHeroMuted: Color,
     val heroChip: Color,
-    val accent: Color
+    val accent: Color,        // لمسة التمييز (الصلاة التالية)
+    val markReview: Color,    // علامة المراجعة (أحمر) — دلالية ثابتة
+    val markMemorized: Color  // علامة الحفظ (أخضر) — دلالية ثابتة
 )
 
-private val LightBrand = BrandColors(
-    heroBrush = Brush.verticalGradient(listOf(Color(0xFF0D7A58), OmanGreenDeep)),
-    onHero = White,
-    onHeroMuted = White.copy(alpha = 0.75f),
-    heroChip = White.copy(alpha = 0.16f),
-    accent = OmanRed
+private val CreamBrand = BrandColors(
+    heroBrush = Brush.verticalGradient(listOf(Teal, TealDeep)),
+    onHero = Color(0xFFFBF6EC),
+    onHeroMuted = Color(0xFFFBF6EC).copy(alpha = 0.78f),
+    heroChip = Color(0xFFFFFFFF).copy(alpha = 0.16f),
+    accent = Color(0xFFE0A93B),      // ذهبي دافئ للمسة التمييز على الرأس
+    markReview = Color(0xFFB23A2E),  // أحمر
+    markMemorized = Color(0xFF2E7D32) // أخضر
 )
 
-private val DarkBrand = BrandColors(
-    heroBrush = Brush.verticalGradient(listOf(Color(0xFF0A4F3B), Color(0xFF06302A))),
-    onHero = White,
-    onHeroMuted = White.copy(alpha = 0.7f),
-    heroChip = White.copy(alpha = 0.12f),
-    accent = Color(0xFFF0646C)
-)
-
-val LocalBrand = staticCompositionLocalOf { LightBrand }
+val LocalBrand = staticCompositionLocalOf { CreamBrand }
 
 private val AppTypography = Typography(
     displaySmall = TextStyle(fontFamily = Cairo, fontWeight = FontWeight.Bold,
@@ -157,16 +128,16 @@ private val AppShapes = Shapes(
 
 @Composable
 fun OmanPrayerTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    // هوية التطبيق ورقية فاتحة ثابتة (لا تتبع الوضع الداكن للنظام).
     MaterialTheme(
-        colorScheme = if (dark) DarkColors else LightColors,
+        colorScheme = CreamColors,
         typography = AppTypography,
         shapes = AppShapes
     ) {
         // التطبيق عربي بالكامل: نثبّت الاتجاه من اليمين لليسار مهما كانت لغة الجهاز
         CompositionLocalProvider(
             LocalLayoutDirection provides LayoutDirection.Rtl,
-            LocalBrand provides if (dark) DarkBrand else LightBrand,
+            LocalBrand provides CreamBrand,
             content = content
         )
     }

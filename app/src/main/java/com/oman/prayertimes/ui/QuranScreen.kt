@@ -203,8 +203,8 @@ private fun SurahReader(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LegendDot(cs.tertiary, "مراجعة")
-            LegendDot(cs.primary, "حفظ")
+            LegendDot(brand.markReview, "مراجعة")
+            LegendDot(brand.markMemorized, "حفظ")
             Spacer(Modifier.weight(1f))
             Text("المس الآية لوضع العلامة",
                 style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
@@ -250,14 +250,15 @@ private fun LegendDot(color: Color, label: String) {
 @Composable
 private fun AyahRow(text: String, ayah: Int, mark: Int, onTap: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val brand = LocalBrand.current
     val barColor = when (mark) {
-        QuranMarks.REVIEW -> cs.tertiary
-        QuranMarks.MEMORIZED -> cs.primary
+        QuranMarks.REVIEW -> brand.markReview
+        QuranMarks.MEMORIZED -> brand.markMemorized
         else -> Color.Transparent
     }
     val bg = when (mark) {
-        QuranMarks.REVIEW -> cs.tertiaryContainer.copy(alpha = 0.5f)
-        QuranMarks.MEMORIZED -> cs.primaryContainer.copy(alpha = 0.6f)
+        QuranMarks.REVIEW -> brand.markReview.copy(alpha = 0.12f)
+        QuranMarks.MEMORIZED -> brand.markMemorized.copy(alpha = 0.12f)
         else -> Color.Transparent
     }
     Row(
