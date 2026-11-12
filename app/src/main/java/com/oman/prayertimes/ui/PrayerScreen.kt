@@ -35,6 +35,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -370,6 +372,11 @@ private fun PrayerHero(
         Spacer(Modifier.height(22.dp))
 
         // شريط التقدّم بين الوقت السابق والقادم (أحمر على أبيض شفاف)
+        val animatedProgress by animateFloatAsState(
+            targetValue = progress,
+            animationSpec = tween(durationMillis = 800),
+            label = "progress"
+        )
         Box(
             Modifier
                 .fillMaxWidth()
@@ -379,7 +386,7 @@ private fun PrayerHero(
         ) {
             Box(
                 Modifier
-                    .fillMaxWidth(progress)
+                    .fillMaxWidth(animatedProgress)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(50))
                     .background(brand.accent)

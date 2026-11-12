@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mosque
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Mosque
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,8 +37,9 @@ private data class Tab(
 )
 
 private val tabs = listOf(
-    Tab("prayer", "المواقيت", Icons.Filled.Mosque, Icons.Filled.Mosque),
-    Tab("settings", "الإعدادات", Icons.Filled.Settings, Icons.Filled.Settings)
+    Tab("prayer", "المواقيت", Icons.Outlined.Mosque, Icons.Filled.Mosque),
+    Tab("athkar", "الأذكار", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite),
+    Tab("settings", "الإعدادات", Icons.Outlined.Settings, Icons.Filled.Settings)
 )
 
 @Composable
@@ -84,6 +89,7 @@ fun MainScreen() {
     ) { padding ->
         NavHost(nav, startDestination = "prayer", modifier = Modifier.padding(padding)) {
             composable("prayer") { PrayerScreen() }
+            composable("athkar") { AthkarScreen() }
             composable("settings") { SettingsScreen() }
         }
     }
