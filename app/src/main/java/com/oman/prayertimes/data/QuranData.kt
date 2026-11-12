@@ -63,34 +63,30 @@ object QuranData {
 }
 
 /**
- * علامات الحفظ والمراجعة لكل آية، محفوظة بين الجلسات.
+ * علامات الصفحات (شريط على حافة الصفحة)، محفوظة بين الجلسات.
  * الحالة: 0 بلا علامة، 1 مراجعة (أحمر)، 2 حفظ (أخضر).
+ * الصفحة برقمها من 1 إلى 604.
  */
 class QuranMarks(context: Context) {
     companion object {
         const val NONE = 0
-        const val REVIEW = 1   // أحمر
-        const val MEMORIZED = 2 // أخضر
+        const val REVIEW = 1    // أحمر — مراجعة
+        const val MEMORIZED = 2 // أخضر — حفظ
     }
 
-    private val prefs = context.getSharedPreferences("quran_marks", Context.MODE_PRIVATE)
-    private fun key(surah: Int, ayah: Int) = "$surah:$ayah"
+    private val prefs = context.getSharedPreferences("quran_page_marks", Context.MODE_PRIVATE)
+    private fun key(page: Int) = "p$page"
 
-    fun get(surah: Int, ayah: Int): Int = prefs.getInt(key(surah, ayah), NONE)
+    fun get(page: Int): Int = prefs.getInt(key(page), NONE)
 
-    /** يدوّر العلامة: بلا ← مراجعة ← حفظ ← بلا. يرجع الحالة الجديدة. */
-    fun cycle(surah: Int, ayah: Int): Int {
-        val next = (get(surah, ayah) + 1) % 3
-        val k = key(surah, ayah)
-        if (next == NONE) prefs.edit().remove(k).apply()
-        else prefs.edit().putInt(k, next).apply()
-        return next
+    fun set(page: Int, state: Int) {
+        if (state == NONE) prefs.edit().remove(key(page)).apply()
+        else prefs.edit().putInt(key(page), state).apply()
     }
 
-    /** عدد آيات السورة المحفوظة (علامة خضراء). */
-    fun memorizedCount(surahId: Int, verseCount: Int): Int {
-        var n = 0
-        for (a in 1..verseCount) if (get(surahId, a) == MEMORIZED) n++
-        return n
-    }
+    /** كل الصفحات المعلَّمة مرتبة: (رقم الصفحة، الحالة). */
+    fun bookmarks(): List<Pair<Int, Int>> =
+        prefs.all.mapNotNull { (k, v) ->
+            if (k.startsWith("p") && v is Int) k.substring(1).toIntOrNull()?.let { it to v } else null
+        }.sortedBy { it.first }
 }
