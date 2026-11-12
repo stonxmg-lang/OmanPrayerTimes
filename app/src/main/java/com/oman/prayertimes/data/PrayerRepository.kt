@@ -17,6 +17,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLException
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManager
@@ -167,11 +168,16 @@ class PrayerRepository(private val context: Context) {
 
     // ── Network ────────────────────────────────────────────────────
     suspend fun hasInternet(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val conn = open("https://www.mara.gov.om")
+        fun probe(insecure: Boolean): Boolean {
+            val conn = open("https://www.mara.gov.om", insecure)
             conn.connectTimeout = 5000
             conn.readTimeout = 5000
-            conn.responseCode in 200..399
+            return conn.responseCode in 200..399
+        }
+        try {
+            probe(insecure = false)
+        } catch (e: SSLException) {
+            try { probe(insecure = true) } catch (e2: Exception) { false }
         } catch (e: Exception) { false }
     }
 
@@ -218,28 +224,39 @@ class PrayerRepository(private val context: Context) {
             all
         }
 
-    // يتخطى فحص الشهادة لموقع mara.gov.om فقط (نفس curl -k)
-    private fun open(url: String): HttpURLConnection {
+    /**
+     * يفتح الاتصال. الوضع الافتراضي يفحص الشهادة بالكامل (آمن).
+     * عند insecure=true فقط نتخطى الفحص لموقع mara.gov.om (نفس curl -k)،
+     * ولا نلجأ له إلا لو فشل الاتصال الآمن بسبب شهادة الموقع الحكومي.
+     */
+    private fun open(url: String, insecure: Boolean = false): HttpURLConnection {
         val conn = URL(url).openConnection() as HttpURLConnection
-        if (conn is HttpsURLConnection) {
+        if (insecure && conn is HttpsURLConnection) {
             conn.sslSocketFactory = sslFactory
-            conn.hostnameVerifier = HostnameVerifier { host, _ -> host.endsWith("mara.gov.om") }
+            conn.hostnameVerifier = HostnameVerifier { host, _ -> host == "mara.gov.om" || host == "www.mara.gov.om" }
         }
         return conn
     }
 
+    private fun postOnce(url: String, form: String, insecure: Boolean): String? {
+        val conn = open(url, insecure)
+        conn.requestMethod = "POST"
+        conn.connectTimeout = 8000
+        conn.readTimeout = 15000
+        conn.doOutput = true
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+        conn.outputStream.use { it.write(form.toByteArray()) }
+        return if (conn.responseCode in 200..299)
+            conn.inputStream.bufferedReader().use { it.readText() }
+        else null
+    }
+
+    /** يجرّب الاتصال الآمن أولًا، ولا يتخطى فحص الشهادة إلا لو فشل بسببها تحديدًا. */
     private fun httpPost(url: String, form: String): String? {
         return try {
-            val conn = open(url)
-            conn.requestMethod = "POST"
-            conn.connectTimeout = 8000
-            conn.readTimeout = 15000
-            conn.doOutput = true
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            conn.outputStream.use { it.write(form.toByteArray()) }
-            if (conn.responseCode in 200..299)
-                conn.inputStream.bufferedReader().use { it.readText() }
-            else null
+            postOnce(url, form, insecure = false)
+        } catch (e: SSLException) {
+            try { postOnce(url, form, insecure = true) } catch (e2: Exception) { null }
         } catch (e: Exception) { null }
     }
 }
