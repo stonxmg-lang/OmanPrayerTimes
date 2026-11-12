@@ -9,6 +9,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Mosque
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -38,6 +40,7 @@ private data class Tab(
 
 private val tabs = listOf(
     Tab("prayer", "المواقيت", Icons.Outlined.Mosque, Icons.Filled.Mosque),
+    Tab("quran", "القرآن", Icons.Outlined.MenuBook, Icons.Filled.MenuBook),
     Tab("athkar", "الأذكار", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite),
     Tab("settings", "الإعدادات", Icons.Outlined.Settings, Icons.Filled.Settings)
 )
@@ -89,6 +92,7 @@ fun MainScreen() {
     ) { padding ->
         NavHost(nav, startDestination = "prayer", modifier = Modifier.padding(padding)) {
             composable("prayer") { PrayerScreen() }
+            composable("quran") { QuranScreen() }
             composable("athkar") { AthkarScreen() }
             composable("settings") { SettingsScreen() }
         }

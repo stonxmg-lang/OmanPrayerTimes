@@ -17,3 +17,9 @@ val Cairo = FontFamily(
     Font(R.font.cairo_bold, FontWeight.Bold),
     Font(R.font.cairo_extrabold, FontWeight.ExtraBold)
 )
+
+/** خط أميري (Amiri) — خط نسخ كلاسيكي لعرض نص القرآن العثماني، مرخّص OFL. */
+val Amiri = FontFamily(
+    Font(R.font.amiri_regular, FontWeight.Normal),
+    Font(R.font.amiri_bold, FontWeight.Bold)
+)

@@ -1,0 +1,5 @@
+نص القرآن الكريم (رواية حفص، الرسم العثماني) مصدره مشروع تنزيل:
+Quran text (Hafs, Uthmani script) is sourced from the Tanzil Project
+https://tanzil.net — used unmodified, with attribution, per Tanzil terms.
+
+Surah metadata and packaging via github.com/risan/quran-json (CC BY-SA 4.0).
