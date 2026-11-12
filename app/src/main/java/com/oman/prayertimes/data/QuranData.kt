@@ -19,7 +19,9 @@ data class Surah(
 private data class QuranFile(
     val basmala: String = "",
     val surahs: List<Surah> = emptyList(),
-    val verses: Map<String, List<String>> = emptyMap()
+    val verses: Map<String, List<String>> = emptyMap(),
+    // صفحات المصحف المدني (604): كل صفحة قائمة [رقم السورة، رقم الآية]
+    val pages: List<List<List<Int>>> = emptyList()
 )
 
 /** نص القرآن العثماني (Tanzil، رواية حفص) محمّلًا من assets/quran.json. */
@@ -42,6 +44,22 @@ object QuranData {
     fun versesOf(context: Context, surahId: Int): List<String> =
         load(context).verses[surahId.toString()].orEmpty()
     fun basmala(context: Context): String = load(context).basmala
+
+    /** صفحات المصحف: pages[i] = قائمة [سورة، آية] المرتبة لتلك الصفحة. */
+    fun pages(context: Context): List<List<List<Int>>> = load(context).pages
+
+    /** نص آية بعينها. */
+    fun verseText(context: Context, surahId: Int, ayah: Int): String =
+        load(context).verses[surahId.toString()]?.getOrNull(ayah - 1).orEmpty()
+
+    /** رقم صفحة (الفهرس من 0) التي تبدأ عندها السورة. */
+    fun firstPageOf(context: Context, surahId: Int): Int {
+        val p = load(context).pages
+        for (i in p.indices) {
+            if (p[i].any { it[0] == surahId && it[1] == 1 }) return i
+        }
+        return 0
+    }
 }
 
 /**
