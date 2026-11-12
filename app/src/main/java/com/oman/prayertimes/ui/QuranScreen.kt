@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Mosque
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -101,7 +102,7 @@ fun QuranScreen() {
 
     val page = startPage
     if (page == null) {
-        SurahIndex(surahs, marks) { startPage = QuranData.firstPageOf(context, it.id) }
+        QuranIndex(surahs) { startPage = it }
     } else {
         BackHandler { startPage = null }
         MushafReader(surahs, marks, page) { startPage = null }
@@ -109,39 +110,74 @@ fun QuranScreen() {
 }
 
 @Composable
-private fun SurahIndex(surahs: List<Surah>, marks: QuranMarks, onSelect: (Surah) -> Unit) {
-    val cs = MaterialTheme.colorScheme
+private fun QuranIndex(surahs: List<Surah>, onOpenPage: (Int) -> Unit) {
     val brand = LocalBrand.current
-    val context = LocalContext.current
-    var query by remember { mutableStateOf("") }
-    val filtered = remember(query) {
-        if (query.isBlank()) surahs
-        else surahs.filter { it.name.contains(query) || it.tr.contains(query, ignoreCase = true) }
-    }
+    var tab by remember { mutableStateOf(0) }
 
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
                 .background(brand.heroBrush).statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp)
         ) {
             Text("القرآن الكريم", style = MaterialTheme.typography.headlineSmall, color = brand.onHero)
             Spacer(Modifier.height(2.dp))
             Text("المصحف — رواية حفص", style = MaterialTheme.typography.labelLarge,
                 color = brand.onHeroMuted)
         }
+        SegmentedTabs(listOf("السور", "الأجزاء", "الصفحات"), tab) { tab = it }
+        when (tab) {
+            0 -> SurahList(surahs, onOpenPage)
+            1 -> JuzList(onOpenPage)
+            else -> PagesList(onOpenPage)
+        }
+    }
+}
 
+@Composable
+private fun SegmentedTabs(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(12.dp))
+            .background(cs.surfaceVariant).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        labels.forEachIndexed { i, label ->
+            val active = i == selected
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
+                    .background(if (active) cs.primary else Color.Transparent)
+                    .clickable { onSelect(i) }.padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(label, style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                    color = if (active) cs.onPrimary else cs.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SurahList(surahs: List<Surah>, onOpenPage: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(query) {
+        if (query.isBlank()) surahs
+        else surahs.filter { it.name.contains(query) || it.tr.contains(query, ignoreCase = true) }
+    }
+    Column(Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = query, onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
             placeholder = { Text("ابحث عن سورة…") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
             singleLine = true, shape = MaterialTheme.shapes.large,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = cs.primary, unfocusedBorderColor = cs.outline)
         )
-
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
@@ -149,7 +185,7 @@ private fun SurahIndex(surahs: List<Surah>, marks: QuranMarks, onSelect: (Surah)
         ) {
             itemsIndexed(filtered, key = { _, s -> s.id }) { _, s ->
                 val pageNum = remember(s.id) { QuranData.firstPageOf(context, s.id) + 1 }
-                AppCard(Modifier.clickable { onSelect(s) }) {
+                AppCard(Modifier.clickable { onOpenPage(pageNum - 1) }) {
                     Row(Modifier.fillMaxWidth().padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
@@ -157,7 +193,9 @@ private fun SurahIndex(surahs: List<Surah>, marks: QuranMarks, onSelect: (Surah)
                             Text(arabicDigits(s.id), style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold, color = cs.primary)
                         }
-                        Spacer(Modifier.width(14.dp))
+                        Spacer(Modifier.width(12.dp))
+                        RevelationIcon(s.type == "meccan")
+                        Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("سورة ${s.name}", style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold, color = cs.onSurface)
@@ -168,6 +206,83 @@ private fun SurahIndex(surahs: List<Surah>, marks: QuranMarks, onSelect: (Surah)
                         Text("صفحة ${arabicDigits(pageNum)}",
                             style = MaterialTheme.typography.labelMedium, color = cs.primary)
                     }
+                }
+            }
+        }
+    }
+}
+
+/** أيقونة بسيطة: الكعبة للمكية، قبة مسجد للمدنية. */
+@Composable
+private fun RevelationIcon(meccan: Boolean) {
+    if (meccan) {
+        // كعبة مبسّطة: مربع داكن بحزام ذهبي
+        Box(Modifier.size(26.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFF2B2B2B)),
+            contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFD4AF37)))
+        }
+    } else {
+        Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Mosque, "مدنية", tint = Color(0xFF2E7D32),
+                modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun JuzList(onOpenPage: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(30) { i ->
+            val startPageNum = JUZ_START[i]
+            AppCard(Modifier.clickable { onOpenPage(startPageNum - 1) }) {
+                Row(Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                        .background(cs.primaryContainer), contentAlignment = Alignment.Center) {
+                        Text(arabicDigits(i + 1), style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold, color = cs.primary)
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Text("الجزء ${JUZ_NAMES[i]}", Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold, color = cs.onSurface)
+                    Text("صفحة ${arabicDigits(startPageNum)}",
+                        style = MaterialTheme.typography.labelMedium, color = cs.primary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PagesList(onOpenPage: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(151) { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (c in 0 until 4) {
+                    val pageNum = row * 4 + c + 1
+                    if (pageNum <= 604) {
+                        Box(
+                            Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                .background(cs.surfaceVariant)
+                                .clickable { onOpenPage(pageNum - 1) }
+                                .padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(arabicDigits(pageNum), style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold, color = cs.onSurface)
+                        }
+                    } else Spacer(Modifier.weight(1f))
                 }
             }
         }
