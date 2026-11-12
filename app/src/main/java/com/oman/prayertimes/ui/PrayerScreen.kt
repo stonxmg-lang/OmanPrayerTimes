@@ -123,8 +123,9 @@ fun PrayerScreen() {
         if (cached != null) { times = cached; state = LoadState.OK }
         else { times = null; state = LoadState.LOADING }
 
-        val refreshed = withContext(Dispatchers.IO) {
-            try { repo.refreshIfNeeded() } catch (e: Exception) { false }
+        val result = withContext(Dispatchers.IO) {
+            try { repo.refreshIfNeeded() }
+            catch (e: Exception) { PrayerRepository.RefreshResult.NO_INTERNET }
         }
         val cache = withContext(Dispatchers.IO) { repo.loadCache() }
         val fresh = repo.getDay(cache, today.year, today.monthValue, today.dayOfMonth)
@@ -140,11 +141,17 @@ fun PrayerScreen() {
         state = LoadState.OK
 
         val age = repo.cacheAgeDays(cache, today.year) ?: 0
-        status = when {
-            refreshed -> DataStatus("تم التحديث من وزارة الأوقاف والشؤون الدينية", true)
-            age == 0 -> DataStatus("البيانات محدّثة اليوم", true)
-            age < 25 -> DataStatus("آخر تحديث منذ $age يوم", true)
-            else -> DataStatus("البيانات قديمة - تعذّر الاتصال بالوزارة", false)
+        status = when (result) {
+            PrayerRepository.RefreshResult.UPDATED ->
+                DataStatus("تم التحديث من وزارة الأوقاف والشؤون الدينية", true)
+            // الصفحة وصلت لكن تعذّرت قراءتها: غالبًا تغيّر تنسيق موقع الوزارة
+            PrayerRepository.RefreshResult.PARSE_FAILED ->
+                DataStatus("تعذّرت قراءة صفحة الوزارة (ربما تغيّر تنسيقها) - المعروض من آخر تحديث", false)
+            else -> when {
+                age == 0 -> DataStatus("البيانات محدّثة اليوم", true)
+                age < 25 -> DataStatus("آخر تحديث منذ $age يوم", true)
+                else -> DataStatus("البيانات قديمة - تعذّر الاتصال بالوزارة", false)
+            }
         }
 
         withContext(Dispatchers.IO) { AlarmScheduler.scheduleForDay(context, fresh, today) }

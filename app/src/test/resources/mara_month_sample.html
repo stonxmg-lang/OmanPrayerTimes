@@ -1,0 +1,77 @@
+<!--
+  عيّنة تمثيلية لصفحة مواقيت وزارة الأوقاف (calendar_page2.asp).
+  الهدف منها اختبار قارئ الـ HTML (PrayerHtmlParser) ضد الشكل المتوقع للصفحة
+  وضد اختلافات شكلية بسيطة. لأفضل حماية، استبدل محتواها بصفحة حقيقية محفوظة
+  من الموقع (احفظ الصفحة من المتصفح) مع إبقاء نفس أسماء ملفات المورد.
+
+  الصفوف هنا تغطّي:
+  - صف ترويسة (عناوين، بلا تاريخ) يجب تجاهله
+  - صفوف أيام بالشكل المعتاد: <td><font>...</font></td>
+  - صف بتنسيق مختلف (بلا <font>، بخصائص مختلفة، بمسافات) يجب أن يُقرأ أيضًا
+  - صف فيه عمود اسم مدينة قبل التاريخ يجب أن يُقرأ أيضًا
+  - صف ناقص (5 أوقات فقط) يجب تجاهله
+-->
+<html dir="rtl">
+<head><meta charset="windows-1256"></head>
+<body>
+<table border="1" width="100%">
+  <tr bgcolor="#dddddd">
+    <td><font>التاريخ</font></td>
+    <td><font>الفجر</font></td>
+    <td><font>الشروق</font></td>
+    <td><font>الظهر</font></td>
+    <td><font>العصر</font></td>
+    <td><font>المغرب</font></td>
+    <td><font>العشاء</font></td>
+  </tr>
+  <tr>
+    <td><font color="#1a1a1a">01/01/2026</font></td>
+    <td><font color="#1a1a1a">05:12</font></td>
+    <td><font color="#1a1a1a">06:34</font></td>
+    <td><font color="#1a1a1a">12:03</font></td>
+    <td><font color="#1a1a1a">15:12</font></td>
+    <td><font color="#1a1a1a">17:28</font></td>
+    <td><font color="#1a1a1a">18:46</font></td>
+  </tr>
+  <tr>
+    <td><font>02/01/2026</font></td>
+    <td><font>05:12</font></td>
+    <td><font>06:34</font></td>
+    <td><font>12:03</font></td>
+    <td><font>15:13</font></td>
+    <td><font>17:29</font></td>
+    <td><font>18:47</font></td>
+  </tr>
+  <!-- تنسيق مختلف: بلا font، خصائص وصنف مختلف، ومسافات زائدة -->
+  <tr class="row-alt">
+    <td style="padding:2px">  03/01/2026  </td>
+    <td style="padding:2px">05:13</td>
+    <td style="padding:2px">06:35</td>
+    <td style="padding:2px">12:04</td>
+    <td style="padding:2px">15:13</td>
+    <td style="padding:2px">17:30</td>
+    <td style="padding:2px">18:48</td>
+  </tr>
+  <!-- عمود اسم مدينة قبل التاريخ: يجب أن يجد التاريخ ثم الأوقات -->
+  <tr>
+    <td><font>مسقط</font></td>
+    <td><font>04/01/2026</font></td>
+    <td><font>05:13</font></td>
+    <td><font>06:35</font></td>
+    <td><font>12:04</font></td>
+    <td><font>15:14</font></td>
+    <td><font>17:31</font></td>
+    <td><font>18:49</font></td>
+  </tr>
+  <!-- صف ناقص: 5 أوقات فقط، يجب تجاهله -->
+  <tr>
+    <td><font>05/01/2026</font></td>
+    <td><font>05:14</font></td>
+    <td><font>06:36</font></td>
+    <td><font>12:04</font></td>
+    <td><font>15:14</font></td>
+    <td><font>17:32</font></td>
+  </tr>
+</table>
+</body>
+</html>

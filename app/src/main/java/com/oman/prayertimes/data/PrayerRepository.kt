@@ -27,19 +27,12 @@ class PrayerRepository(private val context: Context) {
 
     data class YearCache(val fetchedAt: String = "", val days: List<DayTimes> = emptyList())
 
+    /** نتيجة محاولة التحديث: نفرّق بين عدم وجود إنترنت وبين تغيّر صفحة الوزارة. */
+    enum class RefreshResult { UPDATED, UP_TO_DATE, NO_INTERNET, PARSE_FAILED }
+
     private val gson = Gson()
     private val settings = SettingsStore(context)
     private val cacheFile get() = File(context.filesDir, "prayer_cache.json")
-
-    private val monthPattern = Regex(
-        "<td[^>]*>(?:<font[^>]*>)?(\\d+/\\d+/\\d+)(?:</font>)?</td>" +
-        "\\s*<td[^>]*>(?:<font[^>]*>)?(\\d+:\\d+)(?:</font>)?</td>".repeat(6)
-    )
-
-    private val dayPattern = Regex(
-        "<td[^>]*>(\\d+/\\d+/\\d+)</td>" +
-        "\\s*<td[^>]*>(\\d+:\\d+)</td>".repeat(6)
-    )
 
     companion object {
         private val lock = Any()
@@ -132,9 +125,11 @@ class PrayerRepository(private val context: Context) {
 
     /**
      * يحدّث الكاش للمدينة الحالية عند اللزوم (بيانات ناقصة أو أقدم من 25 يومًا،
-     * وبعد بداية نوفمبر يحمّل السنة القادمة). يرجع true إذا تغيّر الكاش.
+     * وبعد بداية نوفمبر يحمّل السنة القادمة).
+     * يرجع RefreshResult: UPDATED عند تغيّر الكاش، UP_TO_DATE إن لم يلزم تحديث،
+     * NO_INTERNET إن تعذّر الوصول للموقع، PARSE_FAILED إن وصلت الصفحة لكن تعذّرت قراءتها.
      */
-    suspend fun refreshIfNeeded(): Boolean {
+    suspend fun refreshIfNeeded(): RefreshResult {
         val cityId = settings.cityId // نثبّتها: لو تغيّرت أثناء التحميل لا تختلط البيانات
         val cache = loadCache()
         val today = LocalDate.now()
@@ -143,18 +138,29 @@ class PrayerRepository(private val context: Context) {
         if (today.monthValue >= 11 && shouldRefreshYear(cache, today.year + 1)) years.add(today.year + 1)
 
         var changed = false
+        var sawParseFail = false
+        var sawNetworkFail = false
         for (y in years) {
-            val days = fetchYear(y, cityId)
+            val fetch = fetchYear(y, cityId)
+            if (fetch.parseFailed) sawParseFail = true
+            if (fetch.networkFailed) sawNetworkFail = true
             val hadOld = cache[keyFor(y, cityId)]?.days?.isNotEmpty() == true
             // لا نستبدل بيانات سليمة ببيانات ناقصة
-            if (days.size >= 350 || (!hadOld && days.isNotEmpty())) {
-                cache[keyFor(y, cityId)] = YearCache(LocalDateTime.now().toString(), days)
+            if (fetch.days.size >= 350 || (!hadOld && fetch.days.isNotEmpty())) {
+                cache[keyFor(y, cityId)] = YearCache(LocalDateTime.now().toString(), fetch.days)
                 changed = true
             }
         }
         if (cleanupOldYears(cache)) changed = true
         if (changed) saveCache(cache)
-        return changed
+
+        return when {
+            changed -> RefreshResult.UPDATED
+            years.isEmpty() -> RefreshResult.UP_TO_DATE   // لم يلزم تحديث أصلًا
+            sawParseFail -> RefreshResult.PARSE_FAILED     // الصفحة وصلت لكن تنسيقها تغيّر
+            sawNetworkFail -> RefreshResult.NO_INTERNET
+            else -> RefreshResult.UP_TO_DATE
+        }
     }
 
     /** بعد تغيير المدينة: حمّل بياناتها ثم أعد جدولة التنبيهات. يرجع false إن لم تتوفر بيانات */
@@ -187,41 +193,57 @@ class PrayerRepository(private val context: Context) {
                 "https://www.mara.gov.om/arabic/calendar_page1.asp",
                 "year=$year&month=$month&day=$day&CityID=$cityId"
             ) ?: return@withContext null
-            dayPattern.find(html)?.let { m ->
-                DayTimes(m.groupValues[1], m.groupValues[2], m.groupValues[3],
-                    m.groupValues[4], m.groupValues[5], m.groupValues[6], m.groupValues[7])
-            }
+            PrayerHtmlParser.parseFirst(html)
         }
 
-    private fun fetchMonth(year: Int, month: Int, cityId: Int): List<DayTimes> {
+    /** نتيجة جلب شهر: نجاح ببيانات، أو فشل شبكة، أو صفحة وصلت لكن تعذّرت قراءتها. */
+    private sealed interface MonthFetch {
+        data class Ok(val days: List<DayTimes>) : MonthFetch
+        object Network : MonthFetch
+        object ParseFail : MonthFetch
+    }
+
+    private fun fetchMonth(year: Int, month: Int, cityId: Int): MonthFetch {
+        var gotHtml = false
         repeat(2) { // محاولتان
             val html = httpPost(
                 "https://www.mara.gov.om/arabic/calendar_page2.asp",
                 "year=$year&month=$month&CityID=$cityId"
             )
             if (html != null) {
-                val list = monthPattern.findAll(html).map { m ->
-                    DayTimes(m.groupValues[1], m.groupValues[2], m.groupValues[3],
-                        m.groupValues[4], m.groupValues[5], m.groupValues[6], m.groupValues[7])
-                }.toList()
-                if (list.isNotEmpty()) return list
+                gotHtml = true
+                val list = PrayerHtmlParser.parse(html)
+                if (list.isNotEmpty()) return MonthFetch.Ok(list)
             }
         }
-        return emptyList()
+        return if (gotHtml) MonthFetch.ParseFail else MonthFetch.Network
     }
 
-    /** تحميل السنة: 4 أشهر بالتوازي في كل دفعة، ويتوقف مبكرًا لو لا يوجد اتصال */
-    suspend fun fetchYear(year: Int, cityId: Int = settings.cityId): List<DayTimes> =
+    data class YearFetch(
+        val days: List<DayTimes>,
+        val parseFailed: Boolean,
+        val networkFailed: Boolean
+    )
+
+    /** تحميل السنة: 4 أشهر بالتوازي في كل دفعة، ويتوقف مبكرًا لو لا يوجد اتصال. */
+    suspend fun fetchYear(year: Int, cityId: Int = settings.cityId): YearFetch =
         withContext(Dispatchers.IO) {
             val all = mutableListOf<DayTimes>()
+            var parseFailed = false
+            var networkFailed = false
             for (chunk in (1..12).chunked(4)) {
                 val parts = coroutineScope {
                     chunk.map { m -> async { fetchMonth(year, m, cityId) } }.awaitAll()
                 }
-                if (parts.all { it.isEmpty() }) break
-                parts.forEach { all.addAll(it) }
+                for (p in parts) when (p) {
+                    is MonthFetch.Ok -> all.addAll(p.days)
+                    is MonthFetch.ParseFail -> parseFailed = true
+                    is MonthFetch.Network -> {}
+                }
+                // كل أشهر هذه الدفعة فشلت شبكيًا (لا HTML) ⇒ على الأرجح لا اتصال، نتوقف
+                if (parts.all { it is MonthFetch.Network }) { networkFailed = true; break }
             }
-            all
+            YearFetch(all, parseFailed, networkFailed && all.isEmpty())
         }
 
     /**
