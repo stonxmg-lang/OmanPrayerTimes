@@ -1,6 +1,6 @@
 package com.oman.prayertimes.ui
 
-import androidx.compose.animation.animateContentSize
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,153 +15,217 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.oman.prayertimes.data.TasbihTexts
+import com.oman.prayertimes.data.AthkarCategory
+import com.oman.prayertimes.data.AthkarData
+import com.oman.prayertimes.data.Zekr
 import com.oman.prayertimes.ui.theme.LocalBrand
 
-/**
- * شاشة الأذكار والتسبيح: اختر صيغة من الأعلى، ثم المس الدائرة الكبيرة للعدّ.
- * عدّاد بسيط في الذاكرة لكل جلسة، مع زر تصفير.
- */
 @Composable
 fun AthkarScreen() {
-    val phrases = TasbihTexts.list
-    var selected by remember { mutableStateOf(0) }
-    val counts = remember { mutableStateListOf(*Array(phrases.size) { 0 }) }
-    val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val categories = remember { AthkarData.categories(context) }
+    var selected by remember { mutableStateOf<AthkarCategory?>(null) }
+
+    val current = selected
+    if (current == null) {
+        CategoriesList(categories) { selected = it }
+    } else {
+        BackHandler { selected = null }
+        CategoryDetail(
+            category = current,
+            athkar = remember(current.id) { AthkarData.athkarOf(context, current.id) },
+            onBack = { selected = null }
+        )
+    }
+}
+
+@Composable
+private fun HeroHeader(title: String, subtitle: String?, onBack: (() -> Unit)? = null) {
     val brand = LocalBrand.current
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-
-        // الرأس الأخضر
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                .background(brand.heroBrush)
-                .statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 22.dp)
-        ) {
-            Text("الأذكار والتسبيح",
-                style = MaterialTheme.typography.headlineSmall, color = brand.onHero)
-            Spacer(Modifier.height(2.dp))
-            Text("اختر صيغة ثم المس الدائرة للعدّ",
-                style = MaterialTheme.typography.labelLarge, color = brand.onHeroMuted)
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // اختيار الصيغة
-        LazyRow(
-            Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            itemsIndexed(phrases) { i, _ ->
-                val active = i == selected
-                Text(
-                    "${i + 1}",
-                    Modifier
-                        .clip(CircleShape)
-                        .background(if (active) cs.primary else cs.surfaceVariant)
-                        .clickable { selected = i }
-                        .size(40.dp)
-                        .padding(top = 9.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    color = if (active) cs.onPrimary else cs.onSurfaceVariant
-                )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+            .background(brand.heroBrush)
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onBack != null) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape)
+                        .background(brand.heroChip).clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع",
+                        tint = brand.onHero, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = brand.onHero)
+                if (subtitle != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(subtitle, style = MaterialTheme.typography.labelLarge,
+                        color = brand.onHeroMuted)
+                }
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(20.dp))
+@Composable
+private fun CategoriesList(
+    categories: List<AthkarCategory>,
+    onSelect: (AthkarCategory) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(query) {
+        if (query.isBlank()) categories
+        else categories.filter { it.name.contains(query) || it.nameShort.contains(query) }
+    }
 
-        // نص الصيغة الحالية
-        AppCard(Modifier.padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxSize()) {
+        HeroHeader("الأذكار", "حصن المسلم — ${categories.size} بابًا")
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            placeholder = { Text("ابحث عن باب…") },
+            leadingIcon = { Icon(Icons.Default.Search, null) },
+            singleLine = true,
+            shape = MaterialTheme.shapes.large,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = cs.primary,
+                unfocusedBorderColor = cs.outline
+            )
+        )
+
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(filtered, key = { it.id }) { cat ->
+                AppCard(Modifier.clickable { onSelect(cat) }) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            cat.nameShort,
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.onSurface
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack, null,
+                            tint = cs.onSurfaceVariant, modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryDetail(
+    category: AthkarCategory,
+    athkar: List<Zekr>,
+    onBack: () -> Unit
+) {
+    Column(Modifier.fillMaxSize()) {
+        HeroHeader(category.nameShort, "${athkar.size} ذِكر", onBack = onBack)
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(athkar, key = { it.id }) { ZekrCard(it) }
+        }
+    }
+}
+
+@Composable
+private fun ZekrCard(zekr: Zekr) {
+    val cs = MaterialTheme.colorScheme
+    var remaining by remember(zekr.id) { mutableStateOf(zekr.count) }
+    val done = remaining == 0
+
+    AppCard {
+        Column(Modifier.fillMaxWidth().padding(18.dp)) {
             Text(
-                phrases[selected],
-                Modifier.fillMaxWidth().padding(20.dp).animateContentSize(),
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
+                zekr.text.ifBlank { zekr.short },
+                style = MaterialTheme.typography.titleMedium.copy(lineHeight =
+                    MaterialTheme.typography.titleMedium.lineHeight * 1.35f),
                 color = cs.onSurface
             )
-        }
-
-        Spacer(Modifier.height(28.dp))
-
-        // العدّاد الكبير
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                Modifier
-                    .size(180.dp)
-                    .clip(CircleShape)
-                    .background(cs.primaryContainer)
-                    .clickable { counts[selected] = counts[selected] + 1 },
-                contentAlignment = Alignment.Center
-            ) {
+            if (zekr.ref.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    "${counts[selected]}",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = cs.primary
+                    zekr.ref,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant
                 )
             }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // تصفير
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(cs.surfaceVariant)
-                    .clickable { counts[selected] = 0 }
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null,
-                    tint = cs.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(6.dp))
-                Text("تصفير", style = MaterialTheme.typography.labelLarge,
-                    color = cs.onSurfaceVariant)
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (zekr.count > 1) {
+                    Text("التكرار: ${zekr.count}", style = MaterialTheme.typography.labelMedium,
+                        color = cs.onSurfaceVariant)
+                }
+                Spacer(Modifier.weight(1f))
+                // عدّاد: المس لتنقص حتى الانتهاء
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(if (done) cs.primary else cs.primaryContainer)
+                        .clickable(enabled = !done) { if (remaining > 0) remaining-- }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (done) {
+                        Icon(Icons.Default.Check, null, tint = cs.onPrimary,
+                            modifier = Modifier.size(18.dp))
+                        Text("تمّ", style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold, color = cs.onPrimary)
+                    } else {
+                        Text("$remaining", style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold, color = cs.primary)
+                    }
+                }
             }
         }
-
-        Spacer(Modifier.height(24.dp))
     }
 }
