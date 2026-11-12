@@ -27,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -54,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import com.oman.prayertimes.data.QuranData
 import com.oman.prayertimes.data.QuranMarks
 import com.oman.prayertimes.data.Surah
+import com.oman.prayertimes.data.TafsirData
 import com.oman.prayertimes.ui.theme.Amiri
 import com.oman.prayertimes.ui.theme.LocalBrand
 import kotlinx.coroutines.launch
@@ -312,6 +316,7 @@ private fun MushafReader(
     }
     var showMarkDialog by remember { mutableStateOf(false) }
     var showGotoDialog by remember { mutableStateOf(false) }
+    var tafsirFor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         // الشريط العلوي: جزء | صفحة | سورة + أزرار العلامة
@@ -339,8 +344,14 @@ private fun MushafReader(
 
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { p ->
             val mark = markState[p + 1] ?: marks.get(p + 1)
-            MushafPage(pages[p], byId, basmala, mark)
+            MushafPage(pages[p], byId, basmala, mark) { s, a -> tafsirFor = s to a }
         }
+    }
+
+    // قارئ التفسير الميسّر عند لمس آية
+    tafsirFor?.let { (s, a) ->
+        val surahName = byId[s]?.name ?: ""
+        TafsirSheet(s, a, surahName) { tafsirFor = null }
     }
 
     // حوار وضع العلامة
@@ -428,7 +439,8 @@ private fun IconChip(icon: androidx.compose.ui.graphics.vector.ImageVector, desc
 
 @Composable
 private fun MushafPage(
-    entries: List<List<Int>>, byId: Map<Int, Surah>, basmala: String, mark: Int
+    entries: List<List<Int>>, byId: Map<Int, Surah>, basmala: String, mark: Int,
+    onAyahTap: (Int, Int) -> Unit
 ) {
     val context = LocalContext.current
     val cs = MaterialTheme.colorScheme
@@ -461,20 +473,27 @@ private fun MushafPage(
                             textAlign = TextAlign.Center, color = cs.onSurface)
                     }
                 }
-                val pageText = remember(run) {
-                    buildString {
+                val annotated = remember(run) {
+                    buildAnnotatedString {
                         for (a in run.ayat) {
+                            pushStringAnnotation("ayah", "${run.surah}:$a")
                             append(QuranData.verseText(context, run.surah, a))
                             append(" ﴿${arabicDigits(a)}﴾ ")
+                            pop()
                         }
                     }
                 }
-                Text(
-                    pageText, Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = Amiri, fontSize = 24.sp, lineHeight = 50.sp),
-                    textAlign = TextAlign.Justify, color = cs.onSurface
-                )
+                ClickableText(
+                    text = annotated,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    style = TextStyle(fontFamily = Amiri, fontSize = 24.sp, lineHeight = 50.sp,
+                        textAlign = TextAlign.Justify, color = cs.onSurface)
+                ) { offset ->
+                    annotated.getStringAnnotations("ayah", offset, offset).firstOrNull()?.let {
+                        val (s, a) = it.item.split(":").map { x -> x.toInt() }
+                        onAyahTap(s, a)
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
             }
             Spacer(Modifier.height(24.dp))
@@ -488,6 +507,35 @@ private fun MushafPage(
             )
         }
     }
+}
+
+/** قارئ التفسير الميسّر لآية: نص الآية بالأحمر ثم تفسيرها. */
+@Composable
+private fun TafsirSheet(surah: Int, ayah: Int, surahName: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    val brand = LocalBrand.current
+    val ayahText = remember(surah, ayah) { QuranData.verseText(context, surah, ayah) }
+    val tafsir = remember(surah, ayah) { TafsirData.of(context, surah, ayah) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("سورة $surahName — الآية ${arabicDigits(ayah)}") },
+        text = {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Text(ayahText,
+                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = Amiri,
+                        fontSize = 22.sp, lineHeight = 42.sp),
+                    color = brand.markReview)
+                Spacer(Modifier.height(12.dp))
+                Text("التفسير الميسّر", style = MaterialTheme.typography.labelLarge, color = cs.primary)
+                Spacer(Modifier.height(6.dp))
+                Text(tafsir.ifBlank { "—" },
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 26.sp),
+                    color = cs.onSurface)
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("إغلاق") } }
+    )
 }
 
 /** إطار اسم السورة المزخرف (اسم السورة + ترتيبها + عدد آياتها). */

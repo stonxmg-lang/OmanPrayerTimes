@@ -1,0 +1,4 @@
+التفسير الميسّر (مجمع الملك فهد لطباعة المصحف الشريف / مركز تفسير)،
+منقول من مشروع مفتوح يجمّع التفاسير بصيغة JSON (spa5k/tafsir_api)،
+ومصدره الأصلي QuranEnc. يُستخدم كمحتوى مرجعي داخل التطبيق.
+Tafsir al-Muyassar — sourced via spa5k/tafsir_api (origin: QuranEnc / King Fahd Complex).

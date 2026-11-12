@@ -62,6 +62,24 @@ object QuranData {
     }
 }
 
+/** التفسير الميسّر: يُحمّل ملف السورة عند الحاجة فقط (assets/tafsir/<سورة>.json). */
+object TafsirData {
+    private val cache = HashMap<Int, List<String>>()
+
+    fun of(context: Context, surahId: Int, ayah: Int): String {
+        val list = synchronized(cache) {
+            cache.getOrPut(surahId) {
+                try {
+                    val json = context.assets.open("tafsir/$surahId.json")
+                        .bufferedReader().use { it.readText() }
+                    Gson().fromJson(json, Array<String>::class.java).toList()
+                } catch (e: Exception) { emptyList() }
+            }
+        }
+        return list.getOrNull(ayah - 1).orEmpty()
+    }
+}
+
 /**
  * علامات الصفحات (شريط على حافة الصفحة)، محفوظة بين الجلسات.
  * الحالة: 0 بلا علامة، 1 مراجعة (أحمر)، 2 حفظ (أخضر).
