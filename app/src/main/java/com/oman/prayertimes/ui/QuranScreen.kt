@@ -1,6 +1,7 @@
 package com.oman.prayertimes.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -140,6 +141,7 @@ private fun SurahIndex(surahs: List<Surah>, onSelect: (Surah) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MushafReader(
     surahs: List<Surah>, marks: QuranMarks, startPage: Int, onBack: () -> Unit
